@@ -7,6 +7,7 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbwPystejCsPwi0FnK3_rZUo
 
 let nomenclature = [];
 let currentMode = 'inventory'; // 'inventory' или 'edit'
+let subMode = 'inventory'; // 'inventory' или 'writeoff'
 
 // Инициализация
 tg.expand();
@@ -39,10 +40,14 @@ async function fetchNomenclature() {
     }
 
     try {
-        const response = await fetch(GAS_URL);
+        const userId = tg.initDataUnsafe?.user?.id || "";
+        const response = await fetch(`${GAS_URL}?userId=${userId}`);
         const data = await response.json();
         
-        if (data.error) {
+        if (data.error === "access_denied") {
+            document.getElementById('blocked-message').textContent = data.message || "Для использования бота необходимо быть участником чата SOURDOG.";
+            showScreen('blocked-screen');
+        } else if (data.error) {
             tg.showAlert("Ошибка сервера: " + data.error);
         } else {
             nomenclature = data;
@@ -60,12 +65,16 @@ async function sendDataToGAS(action, dataObj) {
         return true; // Возвращаем true для тестового прохода
     }
 
-    tg.MainButton.showProgress();
+    const btnId = (action === 'save_inventory' || action === 'save_writeoff') ? 'btn-submit-inventory' : 'btn-submit-nomenclature';
+    const btn = document.getElementById(btnId);
+    const originalText = btn.textContent;
+    
+    btn.disabled = true;
+    btn.textContent = "Сохранение...";
     
     try {
         const response = await fetch(GAS_URL, {
             method: "POST",
-            // Обход CORS в GAS: используем text/plain и no-cors/follow
             redirect: "follow",
             headers: {
                 "Content-Type": "text/plain;charset=utf-8"
@@ -73,12 +82,14 @@ async function sendDataToGAS(action, dataObj) {
             body: JSON.stringify({
                 action: action,
                 data: dataObj,
+                userId: tg.initDataUnsafe?.user?.id || "",
                 user: tg.initDataUnsafe?.user?.first_name || "Неизвестный"
             })
         });
 
         const result = await response.json();
-        tg.MainButton.hideProgress();
+        btn.disabled = false;
+        btn.textContent = originalText;
 
         if (result.status === "success") {
             return true;
@@ -87,7 +98,8 @@ async function sendDataToGAS(action, dataObj) {
             return false;
         }
     } catch (error) {
-        tg.MainButton.hideProgress();
+        btn.disabled = false;
+        btn.textContent = originalText;
         tg.showAlert("Сбой при отправке данных.");
         return false;
     }
@@ -114,28 +126,9 @@ function renderInventory() {
             prodTpl.querySelector('.product-name').textContent = prod.name;
             prodTpl.querySelector('.product-unit').textContent = prod.unit;
             
-            const input = prodTpl.querySelector('.amount-input');
-            const btnMinus = prodTpl.querySelector('.minus');
-            const btnPlus = prodTpl.querySelector('.plus');
+            const input = prodTpl.querySelector('.amount-input-simple');
 
-            // Обработка кнопок +/-
-            btnMinus.onclick = () => {
-                let val = parseFloat(input.value) || 0;
-                if (val > 0) {
-                    // Шаг зависит от единицы измерения. Штуки - по 1, кг - по 0.5 (опционально)
-                    val = Math.max(0, val - 1);
-                    input.value = val;
-                    updateMainButtonState();
-                }
-            };
-            
-            btnPlus.onclick = () => {
-                let val = parseFloat(input.value) || 0;
-                input.value = val + 1;
-                updateMainButtonState();
-            };
-
-            input.oninput = updateMainButtonState;
+            input.oninput = updateSubmitButtonState;
             
             // Сохраняем метаданные в элементе
             input.dataset.category = categoryName;
@@ -148,30 +141,28 @@ function renderInventory() {
         container.appendChild(catTpl);
     }
 
-    // Настраиваем MainButton
-    tg.MainButton.setText('Отправить инвентаризацию');
-    tg.MainButton.onClick(submitInventory);
-    updateMainButtonState(); // Скрыть если пусто
+    updateSubmitButtonState(); // Скрыть если пусто
 }
 
-function updateMainButtonState() {
+function updateSubmitButtonState() {
     if (currentMode !== 'inventory') return;
 
-    const inputs = document.querySelectorAll('#inventory-container .amount-input');
+    const inputs = document.querySelectorAll('#inventory-container .amount-input-simple');
     let hasData = false;
     inputs.forEach(input => {
         if (input.value && parseFloat(input.value) > 0) hasData = true;
     });
 
+    const btnContainer = document.querySelector('#inventory-screen .submit-btn-container');
     if (hasData) {
-        tg.MainButton.show();
+        btnContainer.style.display = 'block';
     } else {
-        tg.MainButton.hide();
+        btnContainer.style.display = 'none';
     }
 }
 
 async function submitInventory() {
-    const inputs = document.querySelectorAll('#inventory-container .amount-input');
+    const inputs = document.querySelectorAll('#inventory-container .amount-input-simple');
     const itemsToSave = [];
 
     inputs.forEach(input => {
@@ -188,12 +179,37 @@ async function submitInventory() {
 
     if (itemsToSave.length === 0) return;
 
-    const success = await sendDataToGAS('save_inventory', itemsToSave);
+    const action = subMode === 'inventory' ? 'save_inventory' : 'save_writeoff';
+    const success = await sendDataToGAS(action, itemsToSave);
     if (success) {
-        tg.showAlert("✅ Инвентаризация успешно сохранена!", () => {
+        const msg = subMode === 'inventory' ? "✅ Инвентаризация успешно сохранена!" : "✅ Списание успешно сохранено!";
+        tg.showAlert(msg, () => {
             tg.close();
         });
     }
+}
+
+// Переключение между Подсчетом и Списанием
+function switchSubMode(mode) {
+    if (subMode === mode) return;
+    subMode = mode;
+    
+    // Переключаем класс активности для табов
+    document.getElementById('tab-inventory').classList.toggle('active', mode === 'inventory');
+    document.getElementById('tab-writeoff').classList.toggle('active', mode === 'writeoff');
+    
+    // Меняем заголовок
+    document.getElementById('screen-title').textContent = mode === 'inventory' ? 'Инвентаризация' : 'Списания';
+    
+    // Меняем текст кнопки отправки
+    const btn = document.getElementById('btn-submit-inventory');
+    btn.textContent = mode === 'inventory' ? 'Отправить инвентаризацию' : 'Сохранить списание';
+    
+    // Очищаем поля ввода при переключении
+    const inputs = document.querySelectorAll('#inventory-container .amount-input-simple');
+    inputs.forEach(input => input.value = '');
+    
+    updateSubmitButtonState();
 }
 
 // ==========================================
@@ -228,18 +244,12 @@ function enterEditMode() {
     currentMode = 'edit';
     renderEditMode();
     showScreen('edit-screen');
-    
-    tg.MainButton.setText('Сохранить базу');
-    tg.MainButton.onClick(submitNomenclature);
-    tg.MainButton.show();
 }
 
 function exitEditMode() {
     currentMode = 'inventory';
-    // Если вышли без сохранения, перерисовываем инвентаризацию со старыми данными
     renderInventory();
     showScreen('inventory-screen');
-    updateMainButtonState();
 }
 
 // ==========================================
