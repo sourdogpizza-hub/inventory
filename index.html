@@ -1,62 +1,105 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Инвентаризация</title>
+    <title>SOURDOG Inventory & Write-offs</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link rel="stylesheet" href="style.css">
-    <!-- Иконки (опционально, для красоты кнопок) -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
 <body>
     <div id="app">
-        <!-- Экран загрузки -->
+        <!-- Loader Screen -->
         <div id="loader" class="screen active">
             <div class="spinner"></div>
-            <p>Загрузка данных...</p>
+            <p>Loading data...</p>
         </div>
 
-        <!-- Окно ввода пароля -->
+        <!-- Access Blocked Screen -->
+        <div id="blocked-screen" class="screen">
+            <div class="blocked-container">
+                <i class="fas fa-user-lock blocked-icon"></i>
+                <h2>Access Restricted</h2>
+                <p id="blocked-message">To use this bot, you must be a member of the SOURDOG Telegram group.</p>
+            </div>
+        </div>
+
+        <!-- PIN Password Modal -->
         <div id="password-modal" class="modal">
             <div class="modal-content">
-                <h3>Режим редактирования</h3>
-                <p>Введите пин-код для доступа:</p>
+                <h3>Admin Access</h3>
+                <p>Enter PIN code to proceed:</p>
                 <input type="password" id="pin-input" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="••••">
                 <div class="modal-buttons">
-                    <button class="btn-cancel" onclick="closePasswordModal()">Отмена</button>
-                    <button class="btn-confirm" onclick="checkPassword()">Войти</button>
+                    <button class="btn-cancel" onclick="closePasswordModal()">Cancel</button>
+                    <button class="btn-confirm" onclick="checkPassword()">Verify</button>
                 </div>
             </div>
         </div>
 
-        <!-- Основной экран (Инвентаризация) -->
-        <div id="inventory-screen" class="screen">
-            <div class="header">
-                <h2>Инвентаризация</h2>
-                <button class="icon-btn" onclick="openPasswordModal()"><i class="fas fa-cog"></i></button>
+        <!-- Main Menu Screen -->
+        <div id="menu-screen" class="screen">
+            <div class="menu-header">
+                <div class="logo-container">
+                    <i class="fas fa-pizza-slice logo-icon"></i>
+                    <h1>SOURDOG</h1>
+                    <p class="subtitle">Kitchen Management</p>
+                </div>
+                <button class="icon-btn-settings" onclick="openPasswordModal()"><i class="fas fa-cog"></i></button>
             </div>
-            <div id="inventory-container" class="list-container">
-                <!-- Категории и продукты будут рендериться здесь -->
+            
+            <div class="menu-options">
+                <button class="menu-btn-large btn-inv" onclick="startAppMode('inventory')">
+                    <i class="fas fa-clipboard-list"></i>
+                    <span>Start Inventory</span>
+                    <span class="btn-desc">Count current kitchen stock</span>
+                </button>
+                
+                <button class="menu-btn-large btn-wroff" onclick="startAppMode('writeoff')">
+                    <i class="fas fa-trash-alt"></i>
+                    <span>Start Write-off</span>
+                    <span class="btn-desc">Log wasted or used products</span>
+                </button>
             </div>
         </div>
 
-        <!-- Экран редактирования (Номенклатура) -->
+        <!-- Inventory / Write-off Screen -->
+        <div id="inventory-screen" class="screen">
+            <div class="header">
+                <button class="icon-btn-back" onclick="goToMainMenu()"><i class="fas fa-arrow-left"></i></button>
+                <h2 id="screen-title">Inventory</h2>
+                <div style="width: 40px;"></div> <!-- Spacer for centering -->
+            </div>
+
+            <div id="inventory-container" class="list-container">
+                <!-- Categories and products will render here -->
+            </div>
+            <div class="submit-btn-container">
+                <button id="btn-submit-inventory" class="btn-main" onclick="submitInventory()">Submit Inventory</button>
+            </div>
+        </div>
+
+        <!-- Admin Edit Screen -->
         <div id="edit-screen" class="screen">
             <div class="header">
-                <h2>Редактор базы</h2>
-                <button class="icon-btn" onclick="exitEditMode()"><i class="fas fa-times"></i></button>
+                <button class="icon-btn-back" onclick="goToMainMenu()"><i class="fas fa-arrow-left"></i></button>
+                <h2>Edit Products</h2>
+                <div style="width: 40px;"></div> <!-- Spacer -->
             </div>
             <div id="edit-container" class="list-container">
-                <!-- Редактор категорий и продуктов -->
+                <!-- Categories and products editor -->
             </div>
             <div class="add-category-btn-container">
-                <button class="btn-secondary" onclick="addCategory()"><i class="fas fa-folder-plus"></i> Новая категория</button>
+                <button class="btn-secondary" onclick="addCategory()"><i class="fas fa-folder-plus"></i> Add Category</button>
+            </div>
+            <div class="submit-btn-container">
+                <button id="btn-submit-nomenclature" class="btn-main" onclick="submitNomenclature()">Save Database</button>
             </div>
         </div>
     </div>
 
-    <!-- Шаблоны для JavaScript -->
+    <!-- Templates -->
     <template id="tpl-inventory-category">
         <div class="category-block">
             <h3 class="category-title"></h3>
@@ -70,10 +113,8 @@
                 <span class="product-name"></span>
                 <span class="product-unit"></span>
             </div>
-            <div class="product-controls">
-                <button class="ctrl-btn minus"><i class="fas fa-minus"></i></button>
-                <input type="number" class="amount-input" value="" placeholder="0" inputmode="decimal">
-                <button class="ctrl-btn plus"><i class="fas fa-plus"></i></button>
+            <div class="product-controls-simple">
+                <input type="number" class="amount-input-simple" value="" placeholder="0" inputmode="decimal">
             </div>
         </div>
     </template>
@@ -81,19 +122,19 @@
     <template id="tpl-edit-category">
         <div class="category-block edit-mode">
             <div class="category-header-edit">
-                <input type="text" class="category-name-input" placeholder="Название категории">
+                <input type="text" class="category-name-input" placeholder="Category Name">
                 <button class="icon-btn text-danger" onclick="deleteCategory(this)"><i class="fas fa-trash"></i></button>
             </div>
             <div class="products-list"></div>
-            <button class="btn-secondary btn-sm" onclick="addProductToCategory(this)"><i class="fas fa-plus"></i> Добавить продукт</button>
+            <button class="btn-secondary btn-sm" onclick="addProductToCategory(this)"><i class="fas fa-plus"></i> Add Product</button>
         </div>
     </template>
 
     <template id="tpl-edit-product">
         <div class="product-item edit-mode">
             <div class="edit-product-inputs">
-                <input type="text" class="product-name-input" placeholder="Название продукта">
-                <input type="text" class="product-unit-input" placeholder="Total (кг, шт, и т.д.)">
+                <input type="text" class="product-name-input" placeholder="Product Name">
+                <input type="text" class="product-unit-input" placeholder="Total (kg, pcs, etc.)">
             </div>
             <button class="icon-btn text-danger" onclick="deleteProduct(this)"><i class="fas fa-trash"></i></button>
         </div>

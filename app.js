@@ -25,16 +25,15 @@ async function fetchNomenclature() {
     showScreen('loader');
     
     if (GAS_URL.includes("macros/s/AKfycbyc")) {
-         // Пока нет реального URL, покажем тестовые данные для демонстрации
-         console.warn("GAS URL не установлен. Используются тестовые данные.");
+         // Fallback test data
+         console.warn("GAS URL not set. Using test data.");
          nomenclature = [
-             {category: "Сыры", name: "Моцарелла", unit: "кг"},
-             {category: "Мясо", name: "Пепперони", unit: "кг"},
-             {category: "Тесто", name: "Мука 00", unit: "кг"}
+             {category: "Cheeses", name: "Mozzarella", unit: "kg"},
+             {category: "Meats", name: "Pepperoni", unit: "kg"},
+             {category: "Dough", name: "Flour 00", unit: "kg"}
          ];
          setTimeout(() => {
-            renderInventory();
-            showScreen('inventory-screen');
+            showScreen('menu-screen');
          }, 500);
          return;
     }
@@ -45,24 +44,23 @@ async function fetchNomenclature() {
         const data = await response.json();
         
         if (data.error === "access_denied") {
-            document.getElementById('blocked-message').textContent = data.message || "Для использования бота необходимо быть участником чата SOURDOG.";
+            document.getElementById('blocked-message').textContent = data.message || "To use this bot, you must be a member of the SOURDOG Telegram group.";
             showScreen('blocked-screen');
         } else if (data.error) {
-            tg.showAlert("Ошибка сервера: " + data.error);
+            tg.showAlert("Server Error: " + data.error);
         } else {
             nomenclature = data;
-            renderInventory();
-            showScreen('inventory-screen');
+            showScreen('menu-screen');
         }
     } catch (error) {
-        tg.showAlert("Ошибка соединения. Проверьте интернет.");
+        tg.showAlert("Connection error. Please check your internet.");
     }
 }
 
 async function sendDataToGAS(action, dataObj) {
     if (GAS_URL.includes("macros/s/AKfycbyc")) {
-        tg.showAlert("Данные не отправлены: Не настроен GAS URL.");
-        return true; // Возвращаем true для тестового прохода
+        tg.showAlert("Data not sent: GAS URL not configured.");
+        return true; 
     }
 
     const btnId = (action === 'save_inventory' || action === 'save_writeoff') ? 'btn-submit-inventory' : 'btn-submit-nomenclature';
@@ -70,7 +68,7 @@ async function sendDataToGAS(action, dataObj) {
     const originalText = btn.textContent;
     
     btn.disabled = true;
-    btn.textContent = "Сохранение...";
+    btn.textContent = "Saving...";
     
     try {
         const response = await fetch(GAS_URL, {
@@ -83,7 +81,7 @@ async function sendDataToGAS(action, dataObj) {
                 action: action,
                 data: dataObj,
                 userId: tg.initDataUnsafe?.user?.id || "",
-                user: tg.initDataUnsafe?.user?.first_name || "Неизвестный"
+                user: tg.initDataUnsafe?.user?.first_name || "Unknown"
             })
         });
 
@@ -94,13 +92,13 @@ async function sendDataToGAS(action, dataObj) {
         if (result.status === "success") {
             return true;
         } else {
-            tg.showAlert("Ошибка: " + result.error);
+            tg.showAlert("Error: " + result.error);
             return false;
         }
     } catch (error) {
         btn.disabled = false;
         btn.textContent = originalText;
-        tg.showAlert("Сбой при отправке данных.");
+        tg.showAlert("Failed to send data.");
         return false;
     }
 }
@@ -182,34 +180,30 @@ async function submitInventory() {
     const action = subMode === 'inventory' ? 'save_inventory' : 'save_writeoff';
     const success = await sendDataToGAS(action, itemsToSave);
     if (success) {
-        const msg = subMode === 'inventory' ? "✅ Инвентаризация успешно сохранена!" : "✅ Списание успешно сохранено!";
+        const msg = subMode === 'inventory' ? "✅ Inventory saved successfully!" : "✅ Write-off saved successfully!";
         tg.showAlert(msg, () => {
             tg.close();
         });
     }
 }
 
-// Переключение между Подсчетом и Списанием
-function switchSubMode(mode) {
-    if (subMode === mode) return;
+// Запуск определенного режима из меню
+function startAppMode(mode) {
     subMode = mode;
     
-    // Переключаем класс активности для табов
-    document.getElementById('tab-inventory').classList.toggle('active', mode === 'inventory');
-    document.getElementById('tab-writeoff').classList.toggle('active', mode === 'writeoff');
-    
-    // Меняем заголовок
-    document.getElementById('screen-title').textContent = mode === 'inventory' ? 'Инвентаризация' : 'Списания';
+    // Меняем заголовок экрана
+    document.getElementById('screen-title').textContent = mode === 'inventory' ? 'Inventory' : 'Write-offs';
     
     // Меняем текст кнопки отправки
     const btn = document.getElementById('btn-submit-inventory');
-    btn.textContent = mode === 'inventory' ? 'Отправить инвентаризацию' : 'Сохранить списание';
+    btn.textContent = mode === 'inventory' ? 'Submit Inventory' : 'Submit Write-off';
     
-    // Очищаем поля ввода при переключении
-    const inputs = document.querySelectorAll('#inventory-container .amount-input-simple');
-    inputs.forEach(input => input.value = '');
-    
-    updateSubmitButtonState();
+    renderInventory();
+    showScreen('inventory-screen');
+}
+
+function goToMainMenu() {
+    showScreen('menu-screen');
 }
 
 // ==========================================
@@ -236,7 +230,7 @@ function checkPassword() {
         closePasswordModal();
         enterEditMode();
     } else {
-        tg.showAlert("Неверный пин-код");
+        tg.showAlert("Incorrect PIN");
     }
 }
 
@@ -248,8 +242,7 @@ function enterEditMode() {
 
 function exitEditMode() {
     currentMode = 'inventory';
-    renderInventory();
-    showScreen('inventory-screen');
+    showScreen('menu-screen');
 }
 
 // ==========================================
@@ -297,7 +290,7 @@ function addCategory() {
 
 function deleteCategory(btn) {
     const block = btn.closest('.category-block');
-    tg.showConfirm("Удалить категорию и все ее продукты?", (confirmed) => {
+    tg.showConfirm("Delete category and all its products?", (confirmed) => {
         if (confirmed) block.remove();
     });
 }
@@ -338,8 +331,8 @@ async function submitNomenclature() {
     const success = await sendDataToGAS('update_nomenclature', newNomenclature);
     if (success) {
         nomenclature = newNomenclature; // Обновляем локально
-        tg.showAlert("✅ База продуктов обновлена!", () => {
-            exitEditMode(); // Возвращаемся в режим инвентаризации
+        tg.showAlert("✅ Database updated successfully!", () => {
+            exitEditMode(); 
         });
     }
 }
