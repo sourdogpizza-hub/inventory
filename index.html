@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Инвентаризация</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="style.css">
+    <!-- Иконки (опционально, для красоты кнопок) -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div id="app">
+        <!-- Экран загрузки -->
+        <div id="loader" class="screen active">
+            <div class="spinner"></div>
+            <p>Загрузка данных...</p>
+        </div>
+
+        <!-- Окно ввода пароля -->
+        <div id="password-modal" class="modal">
+            <div class="modal-content">
+                <h3>Режим редактирования</h3>
+                <p>Введите пин-код для доступа:</p>
+                <input type="password" id="pin-input" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="••••">
+                <div class="modal-buttons">
+                    <button class="btn-cancel" onclick="closePasswordModal()">Отмена</button>
+                    <button class="btn-confirm" onclick="checkPassword()">Войти</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Основной экран (Инвентаризация) -->
+        <div id="inventory-screen" class="screen">
+            <div class="header">
+                <h2>Инвентаризация</h2>
+                <button class="icon-btn" onclick="openPasswordModal()"><i class="fas fa-cog"></i></button>
+            </div>
+            <div id="inventory-container" class="list-container">
+                <!-- Категории и продукты будут рендериться здесь -->
+            </div>
+        </div>
+
+        <!-- Экран редактирования (Номенклатура) -->
+        <div id="edit-screen" class="screen">
+            <div class="header">
+                <h2>Редактор базы</h2>
+                <button class="icon-btn" onclick="exitEditMode()"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="edit-container" class="list-container">
+                <!-- Редактор категорий и продуктов -->
+            </div>
+            <div class="add-category-btn-container">
+                <button class="btn-secondary" onclick="addCategory()"><i class="fas fa-folder-plus"></i> Новая категория</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Шаблоны для JavaScript -->
+    <template id="tpl-inventory-category">
+        <div class="category-block">
+            <h3 class="category-title"></h3>
+            <div class="products-list"></div>
+        </div>
+    </template>
+
+    <template id="tpl-inventory-product">
+        <div class="product-item">
+            <div class="product-info">
+                <span class="product-name"></span>
+                <span class="product-unit"></span>
+            </div>
+            <div class="product-controls">
+                <button class="ctrl-btn minus"><i class="fas fa-minus"></i></button>
+                <input type="number" class="amount-input" value="" placeholder="0" inputmode="decimal">
+                <button class="ctrl-btn plus"><i class="fas fa-plus"></i></button>
+            </div>
+        </div>
+    </template>
+
+    <template id="tpl-edit-category">
+        <div class="category-block edit-mode">
+            <div class="category-header-edit">
+                <input type="text" class="category-name-input" placeholder="Название категории">
+                <button class="icon-btn text-danger" onclick="deleteCategory(this)"><i class="fas fa-trash"></i></button>
+            </div>
+            <div class="products-list"></div>
+            <button class="btn-secondary btn-sm" onclick="addProductToCategory(this)"><i class="fas fa-plus"></i> Добавить продукт</button>
+        </div>
+    </template>
+
+    <template id="tpl-edit-product">
+        <div class="product-item edit-mode">
+            <div class="edit-product-inputs">
+                <input type="text" class="product-name-input" placeholder="Название продукта">
+                <input type="text" class="product-unit-input" placeholder="Ед.изм (кг, шт)">
+            </div>
+            <button class="icon-btn text-danger" onclick="deleteProduct(this)"><i class="fas fa-trash"></i></button>
+        </div>
+    </template>
+
+    <script src="app.js"></script>
+</body>
+</html>
