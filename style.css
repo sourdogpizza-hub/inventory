@@ -25,7 +25,6 @@ body {
     color: var(--tg-theme-text-color);
     font-size: 16px;
     -webkit-font-smoothing: antialiased;
-    padding-bottom: 80px; /* Отступ для MainButton */
 }
 
 /* Экраны */
@@ -36,6 +35,12 @@ body {
 
 .screen.active {
     display: block;
+}
+
+#menu-screen.active {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
 }
 
 /* Хедер */
@@ -394,10 +399,8 @@ button {
 .menu-header {
     display: flex;
     justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 30px;
-    padding-bottom: 16px;
-    border-bottom: 1px solid var(--border-color);
+    align-items: center;
+    margin-bottom: 16px;
 }
 
 .logo-container {
@@ -440,6 +443,8 @@ button {
     display: flex;
     flex-direction: column;
     gap: 16px;
+    flex: 1;
+    margin-bottom: 16px;
 }
 
 .menu-btn-large {
@@ -453,6 +458,7 @@ button {
     text-align: center;
     transition: transform 0.2s, box-shadow 0.2s;
     box-shadow: 0 4px 6px rgba(0,0,0,0.03);
+    flex: 1;
 }
 
 .menu-btn-large:active {
