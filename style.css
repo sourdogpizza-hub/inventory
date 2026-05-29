@@ -56,6 +56,12 @@ body {
     flex: 1;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+    display: flex;
+    flex-direction: column;
+}
+
+#inventory-container, #edit-container {
+    flex: 1;
 }
 
 #menu-screen.active {

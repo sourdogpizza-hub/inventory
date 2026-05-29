@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>SOURDOG Inventory & Write-offs</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="style.css?v=3">
+    <link rel="stylesheet" href="style.css?v=4">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
 <body>
@@ -70,11 +70,13 @@
                 <div style="width: 40px;"></div> <!-- Spacer for centering -->
             </div>
 
-            <div id="inventory-container" class="list-container">
-                <!-- Categories and products will render here -->
-            </div>
-            <div class="submit-btn-container">
-                <button id="btn-submit-inventory" class="btn-main" onclick="submitInventory()">Submit Inventory</button>
+            <div class="list-container">
+                <div id="inventory-container">
+                    <!-- Categories and products will render here -->
+                </div>
+                <div class="submit-btn-container">
+                    <button id="btn-submit-inventory" class="btn-main" onclick="submitInventory()">Submit Inventory</button>
+                </div>
             </div>
         </div>
 
@@ -85,14 +87,16 @@
                 <h2>Edit Products</h2>
                 <div style="width: 40px;"></div> <!-- Spacer -->
             </div>
-            <div id="edit-container" class="list-container">
-                <!-- Categories and products editor -->
-            </div>
-            <div class="add-category-btn-container">
-                <button class="btn-secondary" onclick="addCategory()"><i class="fas fa-folder-plus"></i> Add Category</button>
-            </div>
-            <div class="submit-btn-container">
-                <button id="btn-submit-nomenclature" class="btn-main" onclick="submitNomenclature()">Save Database</button>
+            <div class="list-container">
+                <div id="edit-container">
+                    <!-- Categories and products editor -->
+                </div>
+                <div class="add-category-btn-container">
+                    <button class="btn-secondary" onclick="addCategory()"><i class="fas fa-folder-plus"></i> Add Category</button>
+                </div>
+                <div class="submit-btn-container">
+                    <button id="btn-submit-nomenclature" class="btn-main" onclick="submitNomenclature()">Save Database</button>
+                </div>
             </div>
         </div>
     </div>
@@ -138,6 +142,6 @@
         </div>
     </template>
 
-    <script src="app.js?v=3"></script>
+    <script src="app.js?v=4"></script>
 </body>
 </html>
