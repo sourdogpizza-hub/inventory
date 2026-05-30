@@ -189,20 +189,28 @@ button {
     padding-bottom: 8px;
 }
 
+.product-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
 .btn-dots {
     background: none;
     border: none;
     color: var(--tg-theme-hint-color);
     font-size: 16px;
-    padding: 4px 0 4px 10px;
+    padding: 8px 12px;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: color 0.2s;
+    transition: all 0.2s;
+    border-radius: 50%;
 }
 
 .btn-dots:active {
+    background-color: var(--tg-theme-secondary-bg-color);
     color: var(--tg-theme-text-color);
 }
 

@@ -489,8 +489,10 @@ function handleAddLine(button) {
             <span class="product-name">${name}</span>
             <span class="product-unit">${unit}</span>
         </div>
-        <div class="product-controls-simple">
-            <input type="number" class="amount-input-simple" value="" placeholder="0" inputmode="decimal">
+        <div class="product-actions">
+            <div class="product-controls-simple">
+                <input type="number" class="amount-input-simple" value="" placeholder="0" inputmode="decimal">
+            </div>
             <button class="btn-dots" onclick="showDotsMenu(this, event)"><i class="fas fa-ellipsis-v"></i></button>
         </div>
     `;
