@@ -161,27 +161,41 @@ function updateSubmitButtonState() {
 
 async function submitInventory() {
     const inputs = document.querySelectorAll('#inventory-container .amount-input-simple');
-    const itemsToSave = [];
-
+    
+    // Группируем и суммируем количества для одинаковых продуктов
+    const totals = {};
     inputs.forEach(input => {
         const amount = parseFloat(input.value);
         if (amount > 0) {
-            itemsToSave.push({
-                category: input.dataset.category,
-                name: input.dataset.name,
-                unit: input.dataset.unit,
-                amount: amount
-            });
+            const key = `${input.dataset.category}:::${input.dataset.name}:::${input.dataset.unit}`;
+            totals[key] = (totals[key] || 0) + amount;
         }
     });
+
+    const itemsToSave = [];
+    for (const [key, amount] of Object.entries(totals)) {
+        const [category, name, unit] = key.split(':::');
+        itemsToSave.push({
+            category: category,
+            name: name,
+            unit: unit,
+            amount: amount
+        });
+    }
 
     if (itemsToSave.length === 0) return;
 
     const action = subMode === 'inventory' ? 'save_inventory' : 'save_writeoff';
     const success = await sendDataToGAS(action, itemsToSave);
     if (success) {
-        // Reset all inputs
+        // Сбрасываем значения всех инпутов
         inputs.forEach(input => input.value = '');
+        
+        // Удаляем все добавленные строки
+        document.querySelectorAll('#inventory-container .sub-inputs-container').forEach(container => {
+            container.innerHTML = '';
+        });
+        
         updateSubmitButtonState();
 
         const title = subMode === 'inventory' ? "Inventory Saved" : "Write-off Saved";
@@ -385,4 +399,133 @@ function groupByCategory(items) {
         acc[item.category].push(item);
         return acc;
     }, {});
+}
+
+// ==========================================
+// ЛОГИКА ДОБАВЛЕНИЯ/УДАЛЕНИЯ ПОЛЕЙ ВВОДА (3 ТОЧКИ)
+// ==========================================
+let activeDotsMenu = null;
+
+function showDotsMenu(button, event) {
+    event.stopPropagation();
+    event.preventDefault();
+    
+    // Закрываем предыдущее меню, если оно открыто
+    if (activeDotsMenu) {
+        activeDotsMenu.remove();
+        activeDotsMenu = null;
+    }
+    
+    const productGroup = button.closest('.product-group');
+    const inputsCount = productGroup.querySelectorAll('.amount-input-simple').length;
+    
+    // Создаем элемент меню
+    const menu = document.createElement('div');
+    menu.className = 'dots-menu';
+    
+    // Пункт "Добавить строку"
+    const addBtn = document.createElement('div');
+    addBtn.className = 'dots-menu-item';
+    addBtn.innerHTML = '<i class="fas fa-plus"></i> Добавить';
+    addBtn.onclick = () => {
+        handleAddLine(button);
+        menu.remove();
+        activeDotsMenu = null;
+    };
+    menu.appendChild(addBtn);
+    
+    // Пункт "Удалить строку"
+    const delBtn = document.createElement('div');
+    delBtn.className = 'dots-menu-item text-danger';
+    if (inputsCount <= 1) {
+        delBtn.className += ' disabled';
+    }
+    delBtn.innerHTML = '<i class="fas fa-trash"></i> Удалить';
+    delBtn.onclick = () => {
+        if (inputsCount > 1) {
+            handleDeleteLine(button);
+        }
+        menu.remove();
+        activeDotsMenu = null;
+    };
+    menu.appendChild(delBtn);
+    
+    // Добавляем меню в body, чтобы избежать проблем с overflow hidden
+    document.body.appendChild(menu);
+    activeDotsMenu = menu;
+    
+    // Позиционируем меню рядом с кнопкой
+    const rect = button.getBoundingClientRect();
+    menu.style.top = `${rect.bottom + window.scrollY + 4}px`;
+    menu.style.left = `${rect.right + window.scrollX - menu.offsetWidth}px`;
+    
+    // Закрытие меню при клике в любое другое место
+    const closeMenu = (e) => {
+        if (activeDotsMenu && !activeDotsMenu.contains(e.target) && e.target !== button) {
+            activeDotsMenu.remove();
+            activeDotsMenu = null;
+            document.removeEventListener('click', closeMenu);
+        }
+    };
+    setTimeout(() => {
+        document.addEventListener('click', closeMenu);
+    }, 0);
+}
+
+function handleAddLine(button) {
+    const productGroup = button.closest('.product-group');
+    const subContainer = productGroup.querySelector('.sub-inputs-container');
+    const mainItem = productGroup.querySelector('.product-item');
+    
+    const mainInput = mainItem.querySelector('.amount-input-simple');
+    const category = mainInput.dataset.category;
+    const name = mainInput.dataset.name;
+    const unit = mainInput.dataset.unit;
+    
+    const subItem = document.createElement('div');
+    subItem.className = 'product-item sub-item';
+    subItem.innerHTML = `
+        <div class="product-info" style="visibility: hidden;">
+            <span class="product-name">${name}</span>
+            <span class="product-unit">${unit}</span>
+        </div>
+        <div class="product-controls-simple">
+            <input type="number" class="amount-input-simple" value="" placeholder="0" inputmode="decimal">
+            <button class="btn-dots" onclick="showDotsMenu(this, event)"><i class="fas fa-ellipsis-v"></i></button>
+        </div>
+    `;
+    
+    const newInput = subItem.querySelector('.amount-input-simple');
+    newInput.oninput = updateSubmitButtonState;
+    newInput.dataset.category = category;
+    newInput.dataset.name = name;
+    newInput.dataset.unit = unit;
+    
+    subContainer.appendChild(subItem);
+    
+    // Auto-focus the new input
+    setTimeout(() => newInput.focus(), 50);
+}
+
+function handleDeleteLine(button) {
+    const productItem = button.closest('.product-item');
+    const productGroup = button.closest('.product-group');
+    
+    const inputs = productGroup.querySelectorAll('.amount-input-simple');
+    if (inputs.length <= 1) return;
+    
+    if (productItem.classList.contains('sub-item')) {
+        productItem.remove();
+    } else {
+        const subItems = productGroup.querySelectorAll('.sub-item');
+        if (subItems.length > 0) {
+            const firstSub = subItems[0];
+            const firstSubInput = firstSub.querySelector('.amount-input-simple');
+            const mainInput = productItem.querySelector('.amount-input-simple');
+            
+            mainInput.value = firstSubInput.value;
+            firstSub.remove();
+        }
+    }
+    updateSubmitButtonState();
 }
