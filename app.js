@@ -47,19 +47,19 @@ async function fetchNomenclature() {
             document.getElementById('blocked-message').textContent = data.message || "To use this bot, you must be a member of the SOURDOG Telegram group.";
             showScreen('blocked-screen');
         } else if (data.error) {
-            tg.showAlert("Server Error: " + data.error);
+            showAlert("Server Error: " + data.error);
         } else {
             nomenclature = data;
             showScreen('menu-screen');
         }
     } catch (error) {
-        tg.showAlert("Connection error. Please check your internet.");
+        showAlert("Connection error. Please check your internet.");
     }
 }
 
 async function sendDataToGAS(action, dataObj) {
     if (GAS_URL.includes("macros/s/AKfycbyc")) {
-        tg.showAlert("Data not sent: GAS URL not configured.");
+        showAlert("Data not sent: GAS URL not configured.");
         return true; 
     }
 
@@ -92,13 +92,13 @@ async function sendDataToGAS(action, dataObj) {
         if (result.status === "success") {
             return true;
         } else {
-            tg.showAlert("Error: " + result.error);
+            showAlert("Error: " + result.error);
             return false;
         }
     } catch (error) {
         btn.disabled = false;
         btn.textContent = originalText;
-        tg.showAlert("Failed to send data.");
+        showAlert("Failed to send data.");
         return false;
     }
 }
@@ -180,10 +180,16 @@ async function submitInventory() {
     const action = subMode === 'inventory' ? 'save_inventory' : 'save_writeoff';
     const success = await sendDataToGAS(action, itemsToSave);
     if (success) {
-        const msg = subMode === 'inventory' ? "✅ Inventory saved successfully!" : "✅ Write-off saved successfully!";
-        tg.showAlert(msg, () => {
-            tg.close();
-        });
+        // Reset all inputs
+        inputs.forEach(input => input.value = '');
+        updateSubmitButtonState();
+
+        const title = subMode === 'inventory' ? "Inventory Saved" : "Write-off Saved";
+        const msg = subMode === 'inventory' 
+            ? "Your inventory report has been successfully uploaded to Google Sheets." 
+            : "Your write-off report has been successfully logged.";
+
+        showSuccessModal(title, msg);
     }
 }
 
@@ -230,7 +236,36 @@ function checkPassword() {
         closePasswordModal();
         enterEditMode();
     } else {
-        tg.showAlert("Incorrect PIN");
+        showAlert("Incorrect PIN");
+    }
+}
+
+let successModalCallback = null;
+
+function showSuccessModal(title, message, callback = null) {
+    document.getElementById('success-modal-title').textContent = title;
+    document.getElementById('success-modal-message').textContent = message;
+    successModalCallback = callback;
+    document.getElementById('success-modal').classList.add('active');
+}
+
+function closeSuccessModal() {
+    document.getElementById('success-modal').classList.remove('active');
+    if (successModalCallback) {
+        successModalCallback();
+    } else {
+        goToMainMenu();
+    }
+}
+
+function showAlert(message, callback) {
+    if (tg && typeof tg.showAlert === 'function') {
+        tg.showAlert(message, callback);
+    } else {
+        alert(message);
+        if (typeof callback === 'function') {
+            callback();
+        }
     }
 }
 
@@ -331,9 +366,13 @@ async function submitNomenclature() {
     const success = await sendDataToGAS('update_nomenclature', newNomenclature);
     if (success) {
         nomenclature = newNomenclature; // Обновляем локально
-        tg.showAlert("✅ Database updated successfully!", () => {
-            exitEditMode(); 
-        });
+        showSuccessModal(
+            "Database Saved", 
+            "The product nomenclature database has been successfully updated in Google Sheets.", 
+            () => {
+                exitEditMode(); 
+            }
+        );
     }
 }
 
