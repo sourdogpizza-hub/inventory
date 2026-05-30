@@ -426,7 +426,7 @@ function showDotsMenu(button, event) {
     // Пункт "Добавить строку"
     const addBtn = document.createElement('div');
     addBtn.className = 'dots-menu-item';
-    addBtn.innerHTML = '<i class="fas fa-plus"></i> Добавить';
+    addBtn.innerHTML = '<i class="fas fa-plus"></i> Add';
     addBtn.onclick = () => {
         handleAddLine(button);
         menu.remove();
@@ -440,7 +440,7 @@ function showDotsMenu(button, event) {
     if (inputsCount <= 1) {
         delBtn.className += ' disabled';
     }
-    delBtn.innerHTML = '<i class="fas fa-trash"></i> Удалить';
+    delBtn.innerHTML = '<i class="fas fa-trash"></i> Delete';
     delBtn.onclick = () => {
         if (inputsCount > 1) {
             handleDeleteLine(button);
