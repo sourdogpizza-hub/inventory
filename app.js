@@ -32,9 +32,24 @@ function getFormattedDateTime() {
 }
 
 function showConfirm(message, callback) {
-    const confirmed = confirm(message);
-    if (typeof callback === 'function') {
-        callback(confirmed);
+    if (tg && typeof tg.showPopup === 'function') {
+        tg.showPopup({
+            title: 'Confirm Deletion',
+            message: message,
+            buttons: [
+                { id: "yes", type: "destructive", text: "Delete" },
+                { id: "no", type: "cancel", text: "Cancel" }
+            ]
+        }, function(buttonId) {
+            if (typeof callback === 'function') {
+                callback(buttonId === "yes");
+            }
+        });
+    } else {
+        const confirmed = confirm(message);
+        if (typeof callback === 'function') {
+            callback(confirmed);
+        }
     }
 }
 
