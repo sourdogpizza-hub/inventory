@@ -126,7 +126,10 @@ function renderInventory() {
             
             const input = prodTpl.querySelector('.amount-input-simple');
 
-            input.oninput = updateSubmitButtonState;
+            input.oninput = (e) => {
+                sanitizeDecimalInput(e.target);
+                updateSubmitButtonState();
+            };
             
             // Сохраняем метаданные в элементе
             input.dataset.category = categoryName;
@@ -491,14 +494,17 @@ function handleAddLine(button) {
         </div>
         <div class="product-actions">
             <div class="product-controls-simple">
-                <input type="number" class="amount-input-simple" value="" placeholder="0" inputmode="decimal">
+                <input type="text" class="amount-input-simple" value="" placeholder="0" inputmode="decimal">
             </div>
             <button class="btn-dots" onclick="showDotsMenu(this, event)"><i class="fas fa-ellipsis-v"></i></button>
         </div>
     `;
     
     const newInput = subItem.querySelector('.amount-input-simple');
-    newInput.oninput = updateSubmitButtonState;
+    newInput.oninput = (e) => {
+        sanitizeDecimalInput(e.target);
+        updateSubmitButtonState();
+    };
     newInput.dataset.category = category;
     newInput.dataset.name = name;
     newInput.dataset.unit = unit;
@@ -530,4 +536,18 @@ function handleDeleteLine(button) {
         }
     }
     updateSubmitButtonState();
+}
+
+function sanitizeDecimalInput(input) {
+    // Заменяем все запятые на точки
+    let val = input.value.replace(/,/g, '.');
+    // Удаляем все символы кроме цифр и одной точки
+    val = val.replace(/[^0-9.]/g, '');
+    
+    const parts = val.split('.');
+    if (parts.length > 2) {
+        // Если точек несколько, оставляем только первую
+        val = parts[0] + '.' + parts.slice(1).join('');
+    }
+    input.value = val;
 }
