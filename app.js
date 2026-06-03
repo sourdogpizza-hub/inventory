@@ -603,11 +603,31 @@ function updateAllUnitHelpers() {
         
         const unitLower = baseUnit.toLowerCase();
         if (unitLower === 'kg' || unitLower === 'кг') {
-            const grams = Math.round(val * 1000);
-            helper.textContent = `${grams} g`;
+            if (val < 1) {
+                const grams = Math.round(val * 1000);
+                helper.textContent = `${grams} g`;
+            } else {
+                const kg = Math.floor(val);
+                const grams = Math.round((val - kg) * 1000);
+                if (grams === 0) {
+                    helper.textContent = `${kg} kg`;
+                } else {
+                    helper.textContent = `${kg} kg ${grams} g`;
+                }
+            }
         } else if (unitLower === 'l' || unitLower === 'л') {
-            const ml = Math.round(val * 1000);
-            helper.textContent = `${ml} ml`;
+            if (val < 1) {
+                const ml = Math.round(val * 1000);
+                helper.textContent = `${ml} ml`;
+            } else {
+                const liters = Math.floor(val);
+                const ml = Math.round((val - liters) * 1000);
+                if (ml === 0) {
+                    helper.textContent = `${liters} l`;
+                } else {
+                    helper.textContent = `${liters} l ${ml} ml`;
+                }
+            }
         } else {
             helper.textContent = "";
         }
