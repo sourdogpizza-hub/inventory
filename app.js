@@ -165,24 +165,43 @@ function updateSubmitButtonState() {
 async function submitInventory() {
     const inputs = document.querySelectorAll('#inventory-container .amount-input-simple');
     
-    // Группируем и суммируем количества для одинаковых продуктов
-    const totals = {};
+    // Группируем количества в виде строк для сохранения точности (дробная часть)
+    const groups = {};
     inputs.forEach(input => {
-        const amount = parseFloat(input.value);
+        const valStr = input.value.trim();
+        const amount = parseFloat(valStr);
         if (amount > 0) {
             const key = `${input.dataset.category}:::${input.dataset.name}:::${input.dataset.unit}`;
-            totals[key] = (totals[key] || 0) + amount;
+            if (!groups[key]) {
+                groups[key] = [];
+            }
+            groups[key].push(valStr);
         }
     });
 
     const itemsToSave = [];
-    for (const [key, amount] of Object.entries(totals)) {
+    for (const [key, valStrings] of Object.entries(groups)) {
         const [category, name, unit] = key.split(':::');
+        
+        let sum = 0;
+        let maxDecimals = 0;
+        valStrings.forEach(valStr => {
+            sum += parseFloat(valStr);
+            const parts = valStr.split('.');
+            const decimals = parts.length > 1 ? parts[1].length : 0;
+            if (decimals > maxDecimals) {
+                maxDecimals = decimals;
+            }
+        });
+        
+        // Форматируем сумму с максимальной точностью из введенных полей
+        const formattedAmount = sum.toFixed(maxDecimals);
+        
         itemsToSave.push({
             category: category,
             name: name,
             unit: unit,
-            amount: amount
+            amount: formattedAmount // отправляем как строку (например, "0.180")
         });
     }
 
