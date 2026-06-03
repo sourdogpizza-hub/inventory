@@ -1,5 +1,9 @@
 const tg = window.Telegram.WebApp;
 
+window.onerror = function(message, source, lineno, colno, error) {
+    alert("Error: " + message + " at line " + lineno);
+};
+
 // ==========================================
 // ⚠️ ВАЖНО: Вставьте сюда свой GAS URL ⚠️
 // ==========================================
@@ -62,7 +66,7 @@ function saveActiveDraft() {
             type: subMode,
             date: dateTime.date,
             time: dateTime.time,
-            startedBy: tg?.initDataUnsafe?.user?.first_name || "Unknown",
+            startedBy: (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.first_name) ? tg.initDataUnsafe.user.first_name : "Unknown",
             items: []
         };
         drafts.push(draft);
@@ -293,7 +297,7 @@ async function fetchNomenclature() {
     }
 
     try {
-        const userId = tg?.initDataUnsafe?.user?.id || "";
+        const userId = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) ? tg.initDataUnsafe.user.id : "";
         const response = await fetch(`${GAS_URL}?userId=${userId}`);
         const data = await response.json();
         
@@ -335,8 +339,8 @@ async function sendDataToGAS(action, dataObj) {
             body: JSON.stringify({
                 action: action,
                 data: dataObj,
-                userId: tg?.initDataUnsafe?.user?.id || "",
-                user: tg?.initDataUnsafe?.user?.first_name || "Unknown"
+                userId: (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) ? tg.initDataUnsafe.user.id : "",
+                user: (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.first_name) ? tg.initDataUnsafe.user.first_name : "Unknown"
             })
         });
 
@@ -521,7 +525,7 @@ function startAppMode(mode) {
         type: subMode,
         date: dateTime.date,
         time: dateTime.time,
-        startedBy: tg?.initDataUnsafe?.user?.first_name || "Unknown",
+        startedBy: (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.first_name) ? tg.initDataUnsafe.user.first_name : "Unknown",
         items: []
     };
     const drafts = JSON.parse(localStorage.getItem('sourdog_drafts') || '[]');
@@ -924,7 +928,8 @@ function updateAllUnitHelpers() {
     // Возвращаем подписи в product-unit в исходное состояние (кг/л/шт)
     const mainUnits = document.querySelectorAll('#inventory-container .product-unit');
     mainUnits.forEach(label => {
-        const input = label.closest('.product-group')?.querySelector('.amount-input-simple');
+        const productGroup = label.closest('.product-group');
+        const input = productGroup ? productGroup.querySelector('.amount-input-simple') : null;
         if (input && input.dataset.unit) {
             label.textContent = input.dataset.unit;
         }
