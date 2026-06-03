@@ -8,6 +8,249 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbwPystejCsPwi0FnK3_rZUo
 let nomenclature = [];
 let currentMode = 'inventory'; // 'inventory' или 'edit'
 let subMode = 'inventory'; // 'inventory' или 'writeoff'
+let activeDraftId = null;
+
+// ==========================================
+// ЧЕРНОВИКИ (DRAFTS - IN PROCESS)
+// ==========================================
+
+function showConfirm(message, callback) {
+    if (tg && typeof tg.showConfirm === 'function') {
+        tg.showConfirm(message, callback);
+    } else {
+        const confirmed = confirm(message);
+        if (typeof callback === 'function') {
+            callback(confirmed);
+        }
+    }
+}
+
+function updateDraftsButton() {
+    const drafts = JSON.parse(localStorage.getItem('sourdog_drafts') || '[]');
+    const btn = document.getElementById('btn-in-process');
+    const desc = document.getElementById('drafts-count-desc');
+    
+    if (drafts.length > 0) {
+        btn.style.display = 'flex';
+        if (desc) {
+            desc.textContent = `Continue unfinished sessions (${drafts.length})`;
+        }
+    } else {
+        btn.style.display = 'none';
+    }
+}
+
+function saveActiveDraft() {
+    if (!activeDraftId || currentMode !== 'inventory') return;
+
+    const drafts = JSON.parse(localStorage.getItem('sourdog_drafts') || '[]');
+    let draft = drafts.find(d => d.id === activeDraftId);
+    
+    if (!draft) {
+        draft = {
+            id: activeDraftId,
+            type: subMode,
+            date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+            time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+            startedBy: tg.initDataUnsafe?.user?.first_name || "Unknown",
+            items: []
+        };
+        drafts.push(draft);
+    }
+
+    const items = [];
+    document.querySelectorAll('#inventory-container .product-group').forEach(group => {
+        const mainInput = group.querySelector('.product-item:not(.sub-item) .amount-input-simple');
+        if (!mainInput) return;
+        const category = mainInput.dataset.category;
+        const name = mainInput.dataset.name;
+        const unit = mainInput.dataset.unit;
+        
+        const inputs = group.querySelectorAll('.amount-input-simple');
+        const values = Array.from(inputs).map(inp => inp.value.trim());
+        
+        const hasValue = values.some(val => val !== "");
+        const hasMultiple = values.length > 1;
+        
+        if (hasValue || hasMultiple) {
+            items.push({
+                category: category,
+                name: name,
+                unit: unit,
+                values: values
+            });
+        }
+    });
+
+    draft.items = items;
+    localStorage.setItem('sourdog_drafts', JSON.stringify(drafts));
+    updateDraftsButton();
+}
+
+function showDraftsScreen() {
+    renderDrafts();
+    showScreen('drafts-screen');
+}
+
+function renderDrafts() {
+    const container = document.getElementById('drafts-container');
+    container.innerHTML = '';
+    
+    const drafts = JSON.parse(localStorage.getItem('sourdog_drafts') || '[]');
+    
+    if (drafts.length === 0) {
+        container.innerHTML = '<div style="text-align: center; color: var(--tg-theme-hint-color); padding: 40px 20px;">No active drafts found.</div>';
+        return;
+    }
+    
+    const sortedDrafts = [...drafts].reverse();
+    
+    sortedDrafts.forEach(draft => {
+        const card = document.createElement('div');
+        card.className = 'draft-card';
+        card.onclick = () => resumeDraft(draft.id);
+        
+        const info = document.createElement('div');
+        info.className = 'draft-info';
+        
+        const header = document.createElement('div');
+        header.className = 'draft-header';
+        
+        const badge = document.createElement('span');
+        const isInv = draft.type === 'inventory';
+        badge.className = `draft-badge ${isInv ? 'inventory' : 'writeoff'}`;
+        badge.textContent = isInv ? 'Inventory' : 'Write-off';
+        header.appendChild(badge);
+        
+        info.appendChild(header);
+        
+        const meta = document.createElement('div');
+        meta.className = 'draft-meta';
+        
+        const dateSpan = document.createElement('span');
+        dateSpan.innerHTML = `<i class="far fa-calendar-alt"></i> ${draft.date} ${draft.time}`;
+        meta.appendChild(dateSpan);
+        
+        const userSpan = document.createElement('span');
+        userSpan.innerHTML = `<i class="far fa-user"></i> ${draft.startedBy || "Unknown"}`;
+        meta.appendChild(userSpan);
+        
+        info.appendChild(meta);
+        card.appendChild(info);
+        
+        const dotsBtn = document.createElement('button');
+        dotsBtn.className = 'btn-dots';
+        dotsBtn.innerHTML = '<i class="fas fa-ellipsis-v"></i>';
+        dotsBtn.onclick = (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            showDraftDotsMenu(dotsBtn, draft.id, e);
+        };
+        card.appendChild(dotsBtn);
+        
+        container.appendChild(card);
+    });
+}
+
+let activeDraftDotsMenu = null;
+
+function showDraftDotsMenu(button, draftId, event) {
+    event.stopPropagation();
+    event.preventDefault();
+    
+    if (activeDraftDotsMenu) {
+        activeDraftDotsMenu.remove();
+        activeDraftDotsMenu = null;
+    }
+    
+    const menu = document.createElement('div');
+    menu.className = 'dots-menu';
+    
+    const delBtn = document.createElement('div');
+    delBtn.className = 'dots-menu-item text-danger';
+    delBtn.innerHTML = '<i class="fas fa-trash"></i> Delete';
+    delBtn.onclick = () => {
+        menu.remove();
+        activeDraftDotsMenu = null;
+        showConfirm("Are you sure you want to delete this draft?", (confirmed) => {
+            if (confirmed) {
+                deleteDraft(draftId);
+            }
+        });
+    };
+    menu.appendChild(delBtn);
+    
+    document.body.appendChild(menu);
+    activeDraftDotsMenu = menu;
+    
+    const rect = button.getBoundingClientRect();
+    menu.style.top = `${rect.bottom + window.scrollY + 4}px`;
+    menu.style.left = `${rect.right + window.scrollX - menu.offsetWidth}px`;
+    
+    const closeMenu = (e) => {
+        if (activeDraftDotsMenu && !activeDraftDotsMenu.contains(e.target) && e.target !== button) {
+            activeDraftDotsMenu.remove();
+            activeDraftDotsMenu = null;
+            document.removeEventListener('click', closeMenu);
+        }
+    };
+    setTimeout(() => {
+        document.addEventListener('click', closeMenu);
+    }, 0);
+}
+
+function deleteDraft(draftId) {
+    const drafts = JSON.parse(localStorage.getItem('sourdog_drafts') || '[]');
+    const filtered = drafts.filter(d => d.id !== draftId);
+    localStorage.setItem('sourdog_drafts', JSON.stringify(filtered));
+    
+    if (activeDraftId === draftId) {
+        activeDraftId = null;
+    }
+    
+    renderDrafts();
+    updateDraftsButton();
+}
+
+function resumeDraft(draftId) {
+    const drafts = JSON.parse(localStorage.getItem('sourdog_drafts') || '[]');
+    const draft = drafts.find(d => d.id === draftId);
+    if (!draft) return;
+    
+    activeDraftId = draft.id;
+    subMode = draft.type;
+    
+    document.getElementById('screen-title').textContent = subMode === 'inventory' ? 'Inventory' : 'Write-offs';
+    const btn = document.getElementById('btn-submit-inventory');
+    btn.textContent = subMode === 'inventory' ? 'Submit Inventory' : 'Submit Write-off';
+    
+    renderInventory();
+    
+    draft.items.forEach(item => {
+        const mainInput = Array.from(document.querySelectorAll('#inventory-container .amount-input-simple')).find(inp => 
+            inp.dataset.category === item.category && inp.dataset.name === item.name && !inp.closest('.sub-item')
+        );
+        
+        if (mainInput) {
+            const productGroup = mainInput.closest('.product-group');
+            const dotsBtn = productGroup.querySelector('.btn-dots');
+            
+            for (let i = 1; i < item.values.length; i++) {
+                handleAddLine(dotsBtn, false);
+            }
+            
+            const allInputs = productGroup.querySelectorAll('.amount-input-simple');
+            item.values.forEach((val, idx) => {
+                if (allInputs[idx]) {
+                    allInputs[idx].value = val;
+                }
+            });
+        }
+    });
+    
+    updateSubmitButtonState();
+    showScreen('inventory-screen');
+}
 
 // Инициализация
 tg.expand();
@@ -33,6 +276,7 @@ async function fetchNomenclature() {
              {category: "Dough", name: "Flour 00", unit: "kg"}
          ];
          setTimeout(() => {
+            updateDraftsButton();
             showScreen('menu-screen');
          }, 500);
          return;
@@ -50,6 +294,7 @@ async function fetchNomenclature() {
             showAlert("Server Error: " + data.error);
         } else {
             nomenclature = data;
+            updateDraftsButton();
             showScreen('menu-screen');
         }
     } catch (error) {
@@ -129,6 +374,7 @@ function renderInventory() {
             input.oninput = (e) => {
                 sanitizeDecimalInput(e.target);
                 updateSubmitButtonState();
+                saveActiveDraft();
             };
             
             // Сохраняем метаданные в элементе
@@ -217,6 +463,14 @@ async function submitInventory() {
     const action = subMode === 'inventory' ? 'save_inventory' : 'save_writeoff';
     const success = await sendDataToGAS(action, itemsToSave);
     if (success) {
+        // Удаляем этот черновик из localStorage
+        if (activeDraftId) {
+            const drafts = JSON.parse(localStorage.getItem('sourdog_drafts') || '[]');
+            const filtered = drafts.filter(d => d.id !== activeDraftId);
+            localStorage.setItem('sourdog_drafts', JSON.stringify(filtered));
+            activeDraftId = null;
+        }
+
         // Сбрасываем значения всех инпутов
         inputs.forEach(input => input.value = '');
         
@@ -226,6 +480,7 @@ async function submitInventory() {
         });
         
         updateSubmitButtonState();
+        updateDraftsButton();
 
         const title = subMode === 'inventory' ? "Inventory Saved" : "Write-off Saved";
         const msg = subMode === 'inventory' 
@@ -247,11 +502,29 @@ function startAppMode(mode) {
     const btn = document.getElementById('btn-submit-inventory');
     btn.textContent = mode === 'inventory' ? 'Submit Inventory' : 'Submit Write-off';
     
+    // Генерируем новый ID черновика
+    activeDraftId = "draft_" + Date.now();
+    
+    // Создаем пустой черновик в localStorage
+    const drafts = JSON.parse(localStorage.getItem('sourdog_drafts') || '[]');
+    const newDraft = {
+        id: activeDraftId,
+        type: subMode,
+        date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+        time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+        startedBy: tg.initDataUnsafe?.user?.first_name || "Unknown",
+        items: []
+    };
+    drafts.push(newDraft);
+    localStorage.setItem('sourdog_drafts', JSON.stringify(drafts));
+    
     renderInventory();
     showScreen('inventory-screen');
 }
 
 function goToMainMenu() {
+    activeDraftId = null; // Очищаем активный черновик при возврате на главный экран
+    updateDraftsButton();
     showScreen('menu-screen');
 }
 
@@ -368,7 +641,7 @@ function addCategory() {
 
 function deleteCategory(btn) {
     const block = btn.closest('.category-block');
-    tg.showConfirm("Delete category and all its products?", (confirmed) => {
+    showConfirm("Delete category and all its products?", (confirmed) => {
         if (confirmed) block.remove();
     });
 }
@@ -501,7 +774,7 @@ function showDotsMenu(button, event) {
     }, 0);
 }
 
-function handleAddLine(button) {
+function handleAddLine(button, shouldFocus = true) {
     const productGroup = button.closest('.product-group');
     const subContainer = productGroup.querySelector('.sub-inputs-container');
     const mainItem = productGroup.querySelector('.product-item');
@@ -536,15 +809,19 @@ function handleAddLine(button) {
     newInput.oninput = (e) => {
         sanitizeDecimalInput(e.target);
         updateSubmitButtonState();
+        saveActiveDraft();
     };
     newInput.dataset.category = category;
     newInput.dataset.name = name;
     newInput.dataset.unit = unit;
     
     subContainer.appendChild(subItem);
+    saveActiveDraft();
     
     // Auto-focus the new input
-    setTimeout(() => newInput.focus(), 50);
+    if (shouldFocus) {
+        setTimeout(() => newInput.focus(), 50);
+    }
 }
 
 function handleDeleteLine(button) {
@@ -568,6 +845,7 @@ function handleDeleteLine(button) {
         }
     }
     updateSubmitButtonState();
+    saveActiveDraft();
 }
 
 function sanitizeDecimalInput(input) {

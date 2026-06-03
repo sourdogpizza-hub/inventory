@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>SOURDOG Inventory & Write-offs</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="style.css?v=14">
+    <link rel="stylesheet" href="style.css?v=15">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
 <body>
@@ -71,6 +71,13 @@
                     <span>Start Write-off</span>
                     <span class="btn-desc">Log wasted or used products</span>
                 </button>
+
+                <!-- In Process Option -->
+                <button id="btn-in-process" class="menu-btn-large btn-drafts" onclick="showDraftsScreen()" style="display: none;">
+                    <i class="fas fa-clock"></i>
+                    <span>In Process</span>
+                    <span class="btn-desc" id="drafts-count-desc">Continue unfinished sessions</span>
+                </button>
             </div>
         </div>
 
@@ -88,6 +95,20 @@
                 </div>
                 <div class="submit-btn-container">
                     <button id="btn-submit-inventory" class="btn-main" onclick="submitInventory()">Submit Inventory</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Drafts (In Process) Screen -->
+        <div id="drafts-screen" class="screen">
+            <div class="header">
+                <button class="icon-btn-back" onclick="goToMainMenu()"><i class="fas fa-arrow-left"></i></button>
+                <h2>In Process</h2>
+                <div style="width: 40px;"></div> <!-- Spacer -->
+            </div>
+            <div class="list-container">
+                <div id="drafts-container">
+                    <!-- Draft cards will render here -->
                 </div>
             </div>
         </div>
@@ -163,6 +184,6 @@
         </div>
     </template>
 
-    <script src="app.js?v=14"></script>
+    <script src="app.js?v=15"></script>
 </body>
 </html>
