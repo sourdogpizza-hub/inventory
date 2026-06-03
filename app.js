@@ -524,6 +524,7 @@ function startAppMode(mode) {
         startedBy: tg?.initDataUnsafe?.user?.first_name || "Unknown",
         items: []
     };
+    const drafts = JSON.parse(localStorage.getItem('sourdog_drafts') || '[]');
     drafts.push(newDraft);
     localStorage.setItem('sourdog_drafts', JSON.stringify(drafts));
     
