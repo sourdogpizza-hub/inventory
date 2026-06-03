@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>SOURDOG Inventory & Write-offs</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="style.css?v=15">
+    <link rel="stylesheet" href="style.css?v=18">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
 <body>
@@ -60,6 +60,13 @@
             </div>
             
             <div class="menu-options">
+                <!-- In Process Option -->
+                <button id="btn-in-process" class="menu-btn-large btn-drafts" onclick="showDraftsScreen()" style="display: none;">
+                    <i class="fas fa-clock"></i>
+                    <span>In Process</span>
+                    <span class="btn-desc" id="drafts-count-desc">Continue unfinished sessions</span>
+                </button>
+
                 <button class="menu-btn-large btn-inv" onclick="startAppMode('inventory')">
                     <i class="fas fa-clipboard-list"></i>
                     <span>Start Inventory</span>
@@ -70,13 +77,6 @@
                     <i class="fas fa-trash-alt"></i>
                     <span>Start Write-off</span>
                     <span class="btn-desc">Log wasted or used products</span>
-                </button>
-
-                <!-- In Process Option -->
-                <button id="btn-in-process" class="menu-btn-large btn-drafts" onclick="showDraftsScreen()" style="display: none;">
-                    <i class="fas fa-clock"></i>
-                    <span>In Process</span>
-                    <span class="btn-desc" id="drafts-count-desc">Continue unfinished sessions</span>
                 </button>
             </div>
         </div>
@@ -184,6 +184,6 @@
         </div>
     </template>
 
-    <script src="app.js?v=15"></script>
+    <script src="app.js?v=18"></script>
 </body>
 </html>

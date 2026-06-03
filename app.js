@@ -14,14 +14,23 @@ let activeDraftId = null;
 // ЧЕРНОВИКИ (DRAFTS - IN PROCESS)
 // ==========================================
 
+function getFormattedDateTime() {
+    const now = new Date();
+    const day = String(now.getDate()).padStart(2, '0');
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const year = now.getFullYear();
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    return {
+        date: `${day}/${month}/${year}`,
+        time: `${hours}:${minutes}`
+    };
+}
+
 function showConfirm(message, callback) {
-    if (tg && typeof tg.showConfirm === 'function') {
-        tg.showConfirm(message, callback);
-    } else {
-        const confirmed = confirm(message);
-        if (typeof callback === 'function') {
-            callback(confirmed);
-        }
+    const confirmed = confirm(message);
+    if (typeof callback === 'function') {
+        callback(confirmed);
     }
 }
 
@@ -47,12 +56,13 @@ function saveActiveDraft() {
     let draft = drafts.find(d => d.id === activeDraftId);
     
     if (!draft) {
+        const dateTime = getFormattedDateTime();
         draft = {
             id: activeDraftId,
             type: subMode,
-            date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }),
-            time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
-            startedBy: tg.initDataUnsafe?.user?.first_name || "Unknown",
+            date: dateTime.date,
+            time: dateTime.time,
+            startedBy: tg?.initDataUnsafe?.user?.first_name || "Unknown",
             items: []
         };
         drafts.push(draft);
@@ -283,7 +293,7 @@ async function fetchNomenclature() {
     }
 
     try {
-        const userId = tg.initDataUnsafe?.user?.id || "";
+        const userId = tg?.initDataUnsafe?.user?.id || "";
         const response = await fetch(`${GAS_URL}?userId=${userId}`);
         const data = await response.json();
         
@@ -325,8 +335,8 @@ async function sendDataToGAS(action, dataObj) {
             body: JSON.stringify({
                 action: action,
                 data: dataObj,
-                userId: tg.initDataUnsafe?.user?.id || "",
-                user: tg.initDataUnsafe?.user?.first_name || "Unknown"
+                userId: tg?.initDataUnsafe?.user?.id || "",
+                user: tg?.initDataUnsafe?.user?.first_name || "Unknown"
             })
         });
 
@@ -505,14 +515,13 @@ function startAppMode(mode) {
     // Генерируем новый ID черновика
     activeDraftId = "draft_" + Date.now();
     
-    // Создаем пустой черновик в localStorage
-    const drafts = JSON.parse(localStorage.getItem('sourdog_drafts') || '[]');
+    const dateTime = getFormattedDateTime();
     const newDraft = {
         id: activeDraftId,
         type: subMode,
-        date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }),
-        time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
-        startedBy: tg.initDataUnsafe?.user?.first_name || "Unknown",
+        date: dateTime.date,
+        time: dateTime.time,
+        startedBy: tg?.initDataUnsafe?.user?.first_name || "Unknown",
         items: []
     };
     drafts.push(newDraft);
