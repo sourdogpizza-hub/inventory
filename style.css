@@ -195,6 +195,21 @@ button {
     gap: 8px;
 }
 
+.product-input-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+.input-helper-text {
+    font-size: 11px;
+    color: var(--tg-theme-hint-color);
+    margin-top: 3px;
+    min-height: 14px;
+    text-align: right;
+    font-weight: 500;
+}
+
 .btn-dots {
     background: none;
     border: none;
@@ -282,7 +297,7 @@ button {
 }
 
 .amount-input-simple {
-    width: 70px;
+    width: 80px;
     text-align: right;
     font-size: 16px;
     font-weight: 600;

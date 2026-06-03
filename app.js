@@ -522,8 +522,11 @@ function handleAddLine(button) {
             <span class="product-unit">${unit}</span>
         </div>
         <div class="product-actions">
-            <div class="product-controls-simple">
-                <input type="text" class="amount-input-simple" value="" placeholder="${placeholder}" inputmode="decimal">
+            <div class="product-input-wrapper">
+                <div class="product-controls-simple">
+                    <input type="text" class="amount-input-simple" value="" placeholder="${placeholder}" inputmode="decimal">
+                </div>
+                <div class="input-helper-text"></div>
             </div>
             <button class="btn-dots" onclick="showDotsMenu(this, event)"><i class="fas fa-ellipsis-v"></i></button>
         </div>
@@ -581,47 +584,41 @@ function sanitizeDecimalInput(input) {
     input.value = val;
 }
 
-// Автоматический пересчет и отображение граммов/миллилитров для весовых/жидких категорий
+// Автоматический пересчет и отображение граммов/миллилитров для каждого отдельного поля ввода
 function updateAllUnitHelpers() {
-    const groups = document.querySelectorAll('#inventory-container .product-group');
-    groups.forEach(group => {
-        const mainItem = group.querySelector('.product-item');
-        if (!mainItem) return;
-        const unitLabel = mainItem.querySelector('.product-unit');
-        if (!unitLabel) return;
+    const inputs = document.querySelectorAll('#inventory-container .amount-input-simple');
+    inputs.forEach(input => {
+        const wrapper = input.closest('.product-input-wrapper');
+        if (!wrapper) return;
+        const helper = wrapper.querySelector('.input-helper-text');
+        if (!helper) return;
         
-        const inputs = group.querySelectorAll('.amount-input-simple');
-        let sum = 0;
-        let hasAnyValue = false;
-        let baseUnit = "";
+        const val = parseFloat(input.value);
+        const baseUnit = input.dataset.unit || "";
         
-        inputs.forEach(input => {
-            const val = parseFloat(input.value);
-            if (!isNaN(val) && val > 0) {
-                sum += val;
-                hasAnyValue = true;
-            }
-            if (!baseUnit && input.dataset.unit) {
-                baseUnit = input.dataset.unit;
-            }
-        });
-        
-        if (!baseUnit) return;
-        
-        if (!hasAnyValue) {
-            unitLabel.textContent = baseUnit;
+        if (isNaN(val) || val <= 0 || !baseUnit) {
+            helper.textContent = ""; // очищаем если поле пустое
             return;
         }
         
         const unitLower = baseUnit.toLowerCase();
         if (unitLower === 'kg' || unitLower === 'кг') {
-            const grams = Math.round(sum * 1000);
-            unitLabel.textContent = `${baseUnit} (${grams} g)`;
+            const grams = Math.round(val * 1000);
+            helper.textContent = `${grams} g`;
         } else if (unitLower === 'l' || unitLower === 'л') {
-            const ml = Math.round(sum * 1000);
-            unitLabel.textContent = `${baseUnit} (${ml} ml)`;
+            const ml = Math.round(val * 1000);
+            helper.textContent = `${ml} ml`;
         } else {
-            unitLabel.textContent = baseUnit;
+            helper.textContent = "";
+        }
+    });
+
+    // Возвращаем подписи в product-unit в исходное состояние (кг/л/шт)
+    const mainUnits = document.querySelectorAll('#inventory-container .product-unit');
+    mainUnits.forEach(label => {
+        const input = label.closest('.product-group')?.querySelector('.amount-input-simple');
+        if (input && input.dataset.unit) {
+            label.textContent = input.dataset.unit;
         }
     });
 }
