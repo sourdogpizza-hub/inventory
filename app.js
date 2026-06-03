@@ -136,6 +136,10 @@ function renderInventory() {
             input.dataset.name = prod.name;
             input.dataset.unit = prod.unit;
 
+            // Задаем хинт 0.000 для весовых/жидких продуктов
+            const isWeightOrLiquid = (prod.unit && (prod.unit.toLowerCase() === 'kg' || prod.unit.toLowerCase() === 'кг' || prod.unit.toLowerCase() === 'l' || prod.unit.toLowerCase() === 'л'));
+            input.placeholder = isWeightOrLiquid ? "0.000" : "0";
+
             productsList.appendChild(prodTpl);
         });
 
@@ -160,6 +164,9 @@ function updateSubmitButtonState() {
     } else {
         btnContainer.style.display = 'none';
     }
+
+    // Обновляем подсказки перевода в граммы / мл
+    updateAllUnitHelpers();
 }
 
 async function submitInventory() {
@@ -506,6 +513,9 @@ function handleAddLine(button) {
     
     const subItem = document.createElement('div');
     subItem.className = 'product-item sub-item';
+    const isWeightOrLiquid = (unit && (unit.toLowerCase() === 'kg' || unit.toLowerCase() === 'кг' || unit.toLowerCase() === 'l' || unit.toLowerCase() === 'л'));
+    const placeholder = isWeightOrLiquid ? "0.000" : "0";
+
     subItem.innerHTML = `
         <div class="product-info" style="visibility: hidden;">
             <span class="product-name">${name}</span>
@@ -513,7 +523,7 @@ function handleAddLine(button) {
         </div>
         <div class="product-actions">
             <div class="product-controls-simple">
-                <input type="text" class="amount-input-simple" value="" placeholder="0" inputmode="decimal">
+                <input type="text" class="amount-input-simple" value="" placeholder="${placeholder}" inputmode="decimal">
             </div>
             <button class="btn-dots" onclick="showDotsMenu(this, event)"><i class="fas fa-ellipsis-v"></i></button>
         </div>
@@ -569,4 +579,49 @@ function sanitizeDecimalInput(input) {
         val = parts[0] + '.' + parts.slice(1).join('');
     }
     input.value = val;
+}
+
+// Автоматический пересчет и отображение граммов/миллилитров для весовых/жидких категорий
+function updateAllUnitHelpers() {
+    const groups = document.querySelectorAll('#inventory-container .product-group');
+    groups.forEach(group => {
+        const mainItem = group.querySelector('.product-item');
+        if (!mainItem) return;
+        const unitLabel = mainItem.querySelector('.product-unit');
+        if (!unitLabel) return;
+        
+        const inputs = group.querySelectorAll('.amount-input-simple');
+        let sum = 0;
+        let hasAnyValue = false;
+        let baseUnit = "";
+        
+        inputs.forEach(input => {
+            const val = parseFloat(input.value);
+            if (!isNaN(val) && val > 0) {
+                sum += val;
+                hasAnyValue = true;
+            }
+            if (!baseUnit && input.dataset.unit) {
+                baseUnit = input.dataset.unit;
+            }
+        });
+        
+        if (!baseUnit) return;
+        
+        if (!hasAnyValue) {
+            unitLabel.textContent = baseUnit;
+            return;
+        }
+        
+        const unitLower = baseUnit.toLowerCase();
+        if (unitLower === 'kg' || unitLower === 'кг') {
+            const grams = Math.round(sum * 1000);
+            unitLabel.textContent = `${baseUnit} (${grams} g)`;
+        } else if (unitLower === 'l' || unitLower === 'л') {
+            const ml = Math.round(sum * 1000);
+            unitLabel.textContent = `${baseUnit} (${ml} ml)`;
+        } else {
+            unitLabel.textContent = baseUnit;
+        }
+    });
 }
