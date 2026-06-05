@@ -73,6 +73,18 @@ function updateDraftsButton() {
     if (badge) {
         badge.textContent = drafts.length;
     }
+
+    cleanupHistory(); // ensure expired items are removed
+    const history = JSON.parse(localStorage.getItem('sourdog_history') || '[]');
+    const hBadge = document.getElementById('history-badge');
+    if (hBadge) {
+        if (history.length > 0) {
+            hBadge.textContent = history.length;
+            hBadge.style.display = 'inline-block';
+        } else {
+            hBadge.style.display = 'none';
+        }
+    }
 }
 
 function showHistoryScreen() {
@@ -620,6 +632,12 @@ function renderInventory() {
     container.innerHTML = '';
 
     const categories = groupByCategory(nomenclature);
+
+    if (Object.keys(categories).length === 0) {
+        container.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-muted);">База продуктов пуста. Пожалуйста, добавьте продукты через "Edit Nomenclature".</div>';
+        updateSubmitButtonState();
+        return;
+    }
 
     for (const [categoryName, products] of Object.entries(categories)) {
         const catTpl = document.getElementById('tpl-inventory-category').content.cloneNode(true);
