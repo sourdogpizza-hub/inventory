@@ -1,7 +1,7 @@
 const tg = window.Telegram.WebApp;
 
 window.onerror = function(message, source, lineno, colno, error) {
-    alert("Error: " + message + " at line " + lineno);
+    console.error("Error: " + message + " at line " + lineno);
 };
 
 // ==========================================
@@ -32,19 +32,30 @@ function getFormattedDateTime() {
 }
 
 function showConfirm(message, callback) {
-    if (tg && typeof tg.showPopup === 'function') {
-        tg.showPopup({
-            title: 'Confirm Deletion',
-            message: message,
-            buttons: [
-                { id: "yes", type: "destructive", text: "Delete" },
-                { id: "no", type: "cancel", text: "Cancel" }
-            ]
-        }, function(buttonId) {
+    // Check if we are inside Telegram. tg.platform is 'unknown' in a regular browser.
+    const isTelegram = tg && tg.platform && tg.platform !== 'unknown';
+    
+    if (isTelegram && typeof tg.showPopup === 'function') {
+        try {
+            tg.showPopup({
+                title: 'Confirm Deletion',
+                message: message,
+                buttons: [
+                    { id: "yes", type: "destructive", text: "Delete" },
+                    { id: "no", type: "cancel", text: "Cancel" }
+                ]
+            }, function(buttonId) {
+                if (typeof callback === 'function') {
+                    callback(buttonId === "yes");
+                }
+            });
+        } catch (e) {
+            // Fallback just in case showPopup fails internally
+            const confirmed = confirm(message);
             if (typeof callback === 'function') {
-                callback(buttonId === "yes");
+                callback(confirmed);
             }
-        });
+        }
     } else {
         const confirmed = confirm(message);
         if (typeof callback === 'function') {
@@ -161,7 +172,8 @@ function renderDrafts() {
         meta.appendChild(dateSpan);
         
         const userSpan = document.createElement('span');
-        userSpan.innerHTML = `<i class="far fa-user"></i> ${draft.startedBy || "Unknown"}`;
+        userSpan.innerHTML = '<i class="far fa-user"></i> ';
+        userSpan.appendChild(document.createTextNode(draft.startedBy || "Unknown"));
         meta.appendChild(userSpan);
         
         info.appendChild(meta);
@@ -182,6 +194,7 @@ function renderDrafts() {
 }
 
 let activeDraftDotsMenu = null;
+let activeDraftDotsMenuHandler = null;
 
 function showDraftDotsMenu(button, draftId, event) {
     event.stopPropagation();
@@ -190,6 +203,10 @@ function showDraftDotsMenu(button, draftId, event) {
     if (activeDraftDotsMenu) {
         activeDraftDotsMenu.remove();
         activeDraftDotsMenu = null;
+    }
+    if (activeDraftDotsMenuHandler) {
+        document.removeEventListener('click', activeDraftDotsMenuHandler);
+        activeDraftDotsMenuHandler = null;
     }
     
     const menu = document.createElement('div');
@@ -216,15 +233,16 @@ function showDraftDotsMenu(button, draftId, event) {
     menu.style.top = `${rect.bottom + window.scrollY + 4}px`;
     menu.style.left = `${rect.right + window.scrollX - menu.offsetWidth}px`;
     
-    const closeMenu = (e) => {
+    activeDraftDotsMenuHandler = (e) => {
         if (activeDraftDotsMenu && !activeDraftDotsMenu.contains(e.target) && e.target !== button) {
             activeDraftDotsMenu.remove();
             activeDraftDotsMenu = null;
-            document.removeEventListener('click', closeMenu);
+            document.removeEventListener('click', activeDraftDotsMenuHandler);
+            activeDraftDotsMenuHandler = null;
         }
     };
     setTimeout(() => {
-        document.addEventListener('click', closeMenu);
+        document.addEventListener('click', activeDraftDotsMenuHandler);
     }, 0);
 }
 
@@ -736,6 +754,7 @@ function groupByCategory(items) {
 // ЛОГИКА ДОБАВЛЕНИЯ/УДАЛЕНИЯ ПОЛЕЙ ВВОДА (3 ТОЧКИ)
 // ==========================================
 let activeDotsMenu = null;
+let activeDotsMenuHandler = null;
 
 function showDotsMenu(button, event) {
     event.stopPropagation();
@@ -745,6 +764,10 @@ function showDotsMenu(button, event) {
     if (activeDotsMenu) {
         activeDotsMenu.remove();
         activeDotsMenu = null;
+    }
+    if (activeDotsMenuHandler) {
+        document.removeEventListener('click', activeDotsMenuHandler);
+        activeDotsMenuHandler = null;
     }
     
     const productGroup = button.closest('.product-group');
@@ -791,15 +814,16 @@ function showDotsMenu(button, event) {
     menu.style.left = `${rect.right + window.scrollX - menu.offsetWidth}px`;
     
     // Закрытие меню при клике в любое другое место
-    const closeMenu = (e) => {
+    activeDotsMenuHandler = (e) => {
         if (activeDotsMenu && !activeDotsMenu.contains(e.target) && e.target !== button) {
             activeDotsMenu.remove();
             activeDotsMenu = null;
-            document.removeEventListener('click', closeMenu);
+            document.removeEventListener('click', activeDotsMenuHandler);
+            activeDotsMenuHandler = null;
         }
     };
     setTimeout(() => {
-        document.addEventListener('click', closeMenu);
+        document.addEventListener('click', activeDotsMenuHandler);
     }, 0);
 }
 
