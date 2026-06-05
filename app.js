@@ -28,7 +28,7 @@ function getFormattedDateTime() {
     const hours = String(now.getHours()).padStart(2, '0');
     const minutes = String(now.getMinutes()).padStart(2, '0');
     return {
-        date: `${day}/${month}/${year}`,
+        date: `${day}.${month}.${year}`,
         time: `${hours}:${minutes}`
     };
 }
@@ -135,6 +135,16 @@ function renderHistory() {
         
         info.appendChild(meta);
         card.appendChild(info);
+        
+        const dotsBtn = document.createElement('button');
+        dotsBtn.className = 'btn-dots';
+        dotsBtn.innerHTML = '<i class="fas fa-ellipsis-v"></i>';
+        dotsBtn.onclick = (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            showHistoryDotsMenu(dotsBtn, item.id, item.type, item.date, e);
+        };
+        card.appendChild(dotsBtn);
         
         container.appendChild(card);
     });
@@ -362,6 +372,94 @@ function deleteDraft(draftId) {
     updateDraftsButton();
 }
 
+let activeHistoryDotsMenu = null;
+let activeHistoryDotsMenuHandler = null;
+
+function showHistoryDotsMenu(button, itemId, itemType, itemDate, event) {
+    event.stopPropagation();
+    event.preventDefault();
+    
+    if (activeHistoryDotsMenu) {
+        activeHistoryDotsMenu.remove();
+        activeHistoryDotsMenu = null;
+    }
+    if (activeHistoryDotsMenuHandler) {
+        document.removeEventListener('click', activeHistoryDotsMenuHandler);
+        activeHistoryDotsMenuHandler = null;
+    }
+    
+    const menu = document.createElement('div');
+    menu.className = 'dots-menu';
+    
+    const editBtn = document.createElement('div');
+    editBtn.className = 'dots-menu-item';
+    editBtn.innerHTML = '<i class="fas fa-edit"></i> Edit';
+    editBtn.onclick = () => {
+        menu.remove();
+        activeHistoryDotsMenu = null;
+        resumeHistory(itemId);
+    };
+    menu.appendChild(editBtn);
+    
+    const delBtn = document.createElement('div');
+    delBtn.className = 'dots-menu-item text-danger';
+    delBtn.innerHTML = '<i class="fas fa-trash"></i> Delete';
+    delBtn.onclick = () => {
+        menu.remove();
+        activeHistoryDotsMenu = null;
+        showConfirm(`Are you sure you want to delete this ${itemType === 'inventory' ? 'inventory' : 'write-off'} from history and Google Sheets?`, (confirmed) => {
+            if (confirmed) {
+                deleteHistoryItem(itemId, itemType, itemDate);
+            }
+        });
+    };
+    menu.appendChild(delBtn);
+    
+    document.body.appendChild(menu);
+    activeHistoryDotsMenu = menu;
+    
+    const rect = button.getBoundingClientRect();
+    menu.style.top = `${rect.bottom + window.scrollY + 4}px`;
+    menu.style.left = `${rect.right + window.scrollX - menu.offsetWidth}px`;
+    
+    activeHistoryDotsMenuHandler = (e) => {
+        if (activeHistoryDotsMenu && !activeHistoryDotsMenu.contains(e.target) && e.target !== button) {
+            activeHistoryDotsMenu.remove();
+            activeHistoryDotsMenu = null;
+            document.removeEventListener('click', activeHistoryDotsMenuHandler);
+            activeHistoryDotsMenuHandler = null;
+        }
+    };
+    setTimeout(() => {
+        document.addEventListener('click', activeHistoryDotsMenuHandler);
+    }, 0);
+}
+
+async function deleteHistoryItem(itemId, itemType, itemDate) {
+    showScreen('loader');
+    
+    const action = itemType === 'inventory' ? 'delete_inventory' : 'delete_writeoff';
+    const extraParams = {
+        submissionId: itemId,
+        originalDate: itemDate
+    };
+    
+    const success = await sendDataToGAS(action, [], extraParams);
+    
+    if (success) {
+        const history = JSON.parse(localStorage.getItem('sourdog_history') || '[]');
+        const filtered = history.filter(h => h.id !== itemId);
+        localStorage.setItem('sourdog_history', JSON.stringify(filtered));
+        
+        renderHistory();
+        showScreen('history-screen');
+        showAlert("Successfully deleted from history and Google Sheets.");
+    } else {
+        showScreen('history-screen');
+        showAlert("Failed to delete from Google Sheets.");
+    }
+}
+
 function resumeDraft(draftId) {
     const drafts = JSON.parse(localStorage.getItem('sourdog_drafts') || '[]');
     const draft = drafts.find(d => d.id === draftId);
@@ -461,12 +559,19 @@ async function sendDataToGAS(action, dataObj, extraParams = {}) {
         return true; 
     }
 
-    const btnId = (action === 'save_inventory' || action === 'save_writeoff') ? 'btn-submit-inventory' : 'btn-submit-nomenclature';
-    const btn = document.getElementById(btnId);
-    const originalText = btn.textContent;
+    let btn = null;
+    let originalText = "";
+    if (action === 'save_inventory' || action === 'save_writeoff' || action === 'update_inventory' || action === 'update_writeoff') {
+        btn = document.getElementById('btn-submit-inventory');
+    } else if (action === 'update_nomenclature') {
+        btn = document.getElementById('btn-submit-nomenclature');
+    }
     
-    btn.disabled = true;
-    btn.textContent = "Saving...";
+    if (btn) {
+        originalText = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = "Saving...";
+    }
     
     try {
         const response = await fetch(GAS_URL, {
@@ -485,8 +590,10 @@ async function sendDataToGAS(action, dataObj, extraParams = {}) {
         });
 
         const result = await response.json();
-        btn.disabled = false;
-        btn.textContent = originalText;
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = originalText;
+        }
 
         if (result.status === "success") {
             return true;
@@ -495,8 +602,10 @@ async function sendDataToGAS(action, dataObj, extraParams = {}) {
             return false;
         }
     } catch (error) {
-        btn.disabled = false;
-        btn.textContent = originalText;
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = originalText;
+        }
         showAlert("Failed to send data.");
         return false;
     }
