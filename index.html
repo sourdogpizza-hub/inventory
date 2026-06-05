@@ -60,23 +60,24 @@
             </div>
             
             <div class="menu-options">
-                <!-- In Process Option -->
-                <button id="btn-in-process" class="menu-btn-large btn-drafts" onclick="showDraftsScreen()" style="display: none;">
-                    <i class="fas fa-clock"></i>
-                    <span>In Process</span>
-                    <span class="btn-desc" id="drafts-count-desc">Continue unfinished sessions</span>
-                </button>
-
                 <button class="menu-btn-large btn-inv" onclick="startAppMode('inventory')">
                     <i class="fas fa-clipboard-list"></i>
-                    <span>Start Inventory</span>
-                    <span class="btn-desc">Count current kitchen stock</span>
+                    <span class="title">Inventory</span>
                 </button>
                 
                 <button class="menu-btn-large btn-wroff" onclick="startAppMode('writeoff')">
                     <i class="fas fa-trash-alt"></i>
-                    <span>Start Write-off</span>
-                    <span class="btn-desc">Log wasted or used products</span>
+                    <span class="title">Write-off</span>
+                </button>
+
+                <button id="btn-in-process" class="menu-btn-large btn-drafts" onclick="showDraftsScreen()">
+                    <i class="fas fa-clock"></i>
+                    <span class="title">In Process <span id="drafts-badge" class="badge">0</span></span>
+                </button>
+
+                <button id="btn-history" class="menu-btn-large btn-history" onclick="showHistoryScreen()">
+                    <i class="fas fa-paper-plane"></i>
+                    <span class="title">Sent</span>
                 </button>
             </div>
         </div>
@@ -109,6 +110,20 @@
             <div class="list-container">
                 <div id="drafts-container">
                     <!-- Draft cards will render here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- History Screen -->
+        <div id="history-screen" class="screen">
+            <div class="header">
+                <button class="icon-btn-back" onclick="goToMainMenu()"><i class="fas fa-arrow-left"></i></button>
+                <h2>Sent History</h2>
+                <div style="width: 40px;"></div> <!-- Spacer -->
+            </div>
+            <div class="list-container">
+                <div id="history-container">
+                    <!-- History cards will render here -->
                 </div>
             </div>
         </div>

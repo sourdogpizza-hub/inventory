@@ -13,6 +13,8 @@ let nomenclature = [];
 let currentMode = 'inventory'; // 'inventory' или 'edit'
 let subMode = 'inventory'; // 'inventory' или 'writeoff'
 let activeDraftId = null;
+let isHistoryEdit = false;
+let historyOriginalDate = null;
 
 // ==========================================
 // ЧЕРНОВИКИ (DRAFTS - IN PROCESS)
@@ -66,17 +68,118 @@ function showConfirm(message, callback) {
 
 function updateDraftsButton() {
     const drafts = JSON.parse(localStorage.getItem('sourdog_drafts') || '[]');
-    const btn = document.getElementById('btn-in-process');
-    const desc = document.getElementById('drafts-count-desc');
+    const badge = document.getElementById('drafts-badge');
     
-    if (drafts.length > 0) {
-        btn.style.display = 'flex';
-        if (desc) {
-            desc.textContent = `Continue unfinished sessions (${drafts.length})`;
-        }
-    } else {
-        btn.style.display = 'none';
+    if (badge) {
+        badge.textContent = drafts.length;
     }
+}
+
+function showHistoryScreen() {
+    cleanupHistory();
+    renderHistory();
+    showScreen('history-screen');
+}
+
+function cleanupHistory() {
+    const history = JSON.parse(localStorage.getItem('sourdog_history') || '[]');
+    const now = Date.now();
+    const twentyFourHours = 24 * 60 * 60 * 1000;
+    const filtered = history.filter(h => (now - h.timestamp) < twentyFourHours);
+    localStorage.setItem('sourdog_history', JSON.stringify(filtered));
+}
+
+function renderHistory() {
+    const container = document.getElementById('history-container');
+    container.innerHTML = '';
+    
+    const history = JSON.parse(localStorage.getItem('sourdog_history') || '[]');
+    
+    if (history.length === 0) {
+        container.innerHTML = '<div style="text-align: center; color: var(--tg-theme-hint-color); padding: 40px 20px;">No sent history from the last 24 hours.</div>';
+        return;
+    }
+    
+    const sortedHistory = [...history].sort((a, b) => b.timestamp - a.timestamp);
+    
+    sortedHistory.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'draft-card';
+        card.onclick = () => resumeHistory(item.id);
+        
+        const info = document.createElement('div');
+        info.className = 'draft-info';
+        
+        const header = document.createElement('div');
+        header.className = 'draft-header';
+        
+        const badge = document.createElement('span');
+        const isInv = item.type === 'inventory';
+        badge.className = `draft-badge ${isInv ? 'inventory' : 'writeoff'}`;
+        badge.textContent = isInv ? 'Inventory' : 'Write-off';
+        header.appendChild(badge);
+        
+        info.appendChild(header);
+        
+        const meta = document.createElement('div');
+        meta.className = 'draft-meta';
+        
+        const dateSpan = document.createElement('span');
+        dateSpan.innerHTML = `<i class="far fa-calendar-alt"></i> ${item.date} ${item.time}`;
+        meta.appendChild(dateSpan);
+        
+        const userSpan = document.createElement('span');
+        userSpan.innerHTML = '<i class="far fa-user"></i> ';
+        userSpan.appendChild(document.createTextNode(item.startedBy || "Unknown"));
+        meta.appendChild(userSpan);
+        
+        info.appendChild(meta);
+        card.appendChild(info);
+        
+        container.appendChild(card);
+    });
+}
+
+function resumeHistory(historyId) {
+    const history = JSON.parse(localStorage.getItem('sourdog_history') || '[]');
+    const item = history.find(h => h.id === historyId);
+    if (!item) return;
+    
+    activeDraftId = item.id;
+    subMode = item.type;
+    isHistoryEdit = true;
+    historyOriginalDate = item.date;
+    
+    document.getElementById('screen-title').textContent = subMode === 'inventory' ? 'Edit Inventory' : 'Edit Write-off';
+    const btn = document.getElementById('btn-submit-inventory');
+    btn.textContent = 'Update & Resubmit';
+    
+    renderInventory();
+    
+    item.items.forEach(prod => {
+        const mainInput = Array.from(document.querySelectorAll('#inventory-container .amount-input-simple')).find(inp => 
+            inp.dataset.category === prod.category && inp.dataset.name === prod.name && !inp.closest('.sub-item')
+        );
+        
+        if (mainInput) {
+            const productGroup = mainInput.closest('.product-group');
+            const dotsBtn = productGroup.querySelector('.btn-dots');
+            
+            for (let i = 1; i < prod.values.length; i++) {
+                handleAddLine(dotsBtn, false);
+            }
+            
+            const allInputs = productGroup.querySelectorAll('.amount-input-simple');
+            prod.values.forEach((val, idx) => {
+                if (allInputs[idx]) {
+                    allInputs[idx].value = val;
+                }
+            });
+        }
+    });
+    
+    updateSubmitButtonState();
+    showScreen('inventory-screen');
 }
 
 function saveActiveDraft() {
@@ -266,6 +369,8 @@ function resumeDraft(draftId) {
     
     activeDraftId = draft.id;
     subMode = draft.type;
+    isHistoryEdit = false;
+    historyOriginalDate = null;
     
     document.getElementById('screen-title').textContent = subMode === 'inventory' ? 'Inventory' : 'Write-offs';
     const btn = document.getElementById('btn-submit-inventory');
@@ -304,6 +409,7 @@ tg.expand();
 tg.ready();
 
 document.addEventListener('DOMContentLoaded', () => {
+    cleanupHistory();
     fetchNomenclature();
 });
 
@@ -349,7 +455,7 @@ async function fetchNomenclature() {
     }
 }
 
-async function sendDataToGAS(action, dataObj) {
+async function sendDataToGAS(action, dataObj, extraParams = {}) {
     if (GAS_URL.includes("macros/s/AKfycbyc")) {
         showAlert("Data not sent: GAS URL not configured.");
         return true; 
@@ -373,7 +479,8 @@ async function sendDataToGAS(action, dataObj) {
                 action: action,
                 data: dataObj,
                 userId: (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) ? tg.initDataUnsafe.user.id : "",
-                user: (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.first_name) ? tg.initDataUnsafe.user.first_name : "Unknown"
+                user: (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.first_name) ? tg.initDataUnsafe.user.first_name : "Unknown",
+                ...extraParams
             })
         });
 
@@ -507,16 +614,39 @@ async function submitInventory() {
 
     if (itemsToSave.length === 0) return;
 
-    const action = subMode === 'inventory' ? 'save_inventory' : 'save_writeoff';
-    const success = await sendDataToGAS(action, itemsToSave);
+    let action = subMode === 'inventory' ? 'save_inventory' : 'save_writeoff';
+    if (isHistoryEdit) {
+        action = subMode === 'inventory' ? 'update_inventory' : 'update_writeoff';
+    }
+
+    const extraParams = {
+        submissionId: activeDraftId,
+        originalDate: historyOriginalDate
+    };
+
+    const success = await sendDataToGAS(action, itemsToSave, extraParams);
     if (success) {
-        // Удаляем этот черновик из localStorage
-        if (activeDraftId) {
-            const drafts = JSON.parse(localStorage.getItem('sourdog_drafts') || '[]');
-            const filtered = drafts.filter(d => d.id !== activeDraftId);
-            localStorage.setItem('sourdog_drafts', JSON.stringify(filtered));
-            activeDraftId = null;
+        saveActiveDraft();
+        const drafts = JSON.parse(localStorage.getItem('sourdog_drafts') || '[]');
+        const draftIndex = drafts.findIndex(d => d.id === activeDraftId);
+        
+        if (draftIndex !== -1) {
+            const completedDraft = drafts[draftIndex];
+            completedDraft.timestamp = Date.now();
+            completedDraft.date = historyOriginalDate || completedDraft.date; // Keep original date in history
+            
+            const history = JSON.parse(localStorage.getItem('sourdog_history') || '[]');
+            const filteredHistory = history.filter(h => h.id !== activeDraftId);
+            filteredHistory.push(completedDraft);
+            localStorage.setItem('sourdog_history', JSON.stringify(filteredHistory));
+            
+            drafts.splice(draftIndex, 1);
+            localStorage.setItem('sourdog_drafts', JSON.stringify(drafts));
         }
+
+        activeDraftId = null;
+        isHistoryEdit = false;
+        historyOriginalDate = null;
 
         // Сбрасываем значения всех инпутов
         inputs.forEach(input => input.value = '');
@@ -541,6 +671,8 @@ async function submitInventory() {
 // Запуск определенного режима из меню
 function startAppMode(mode) {
     subMode = mode;
+    isHistoryEdit = false;
+    historyOriginalDate = null;
     
     // Меняем заголовок экрана
     document.getElementById('screen-title').textContent = mode === 'inventory' ? 'Inventory' : 'Write-offs';
@@ -571,6 +703,8 @@ function startAppMode(mode) {
 
 function goToMainMenu() {
     activeDraftId = null; // Очищаем активный черновик при возврате на главный экран
+    isHistoryEdit = false;
+    historyOriginalDate = null;
     updateDraftsButton();
     showScreen('menu-screen');
 }
