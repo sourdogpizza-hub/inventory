@@ -7,9 +7,11 @@ window.onerror = function(message, source, lineno, colno, error) {
 // ==========================================
 // ⚠️ ВАЖНО: Вставьте сюда свой GAS URL ⚠️
 // ==========================================
-const GAS_URL = "https://script.google.com/macros/s/AKfycbwPystejCsPwi0FnK3_rZUomTPqnwLW7zDMIViyUHuCGMjGqIOKZ2hxkTuETfbVYGx2/exec";
+const GAS_URL = "https://script.google.com/macros/s/AKfycbwd_Ho4QGUqXJaJz2Z9ofjMUYGdgnV3mjpZeDpAfNcWwLXxCUJR2OEZvM_2pHFvdeqWLg/exec";
 
 let nomenclature = [];
+let venues = [];
+let currentVenue = null; // { id: "...", name: "...", rawUrl: "..." }
 let currentMode = 'inventory'; // 'inventory' или 'edit'
 let subMode = 'inventory'; // 'inventory' или 'writeoff'
 let activeDraftId = null;
@@ -17,7 +19,7 @@ let isHistoryEdit = false;
 let historyOriginalDate = null;
 
 // ==========================================
-// ЧЕРНОВИКИ (DRAFTS - IN PROCESS)
+// ЧЕРНОВИКИ И ИСТОРИЯ (ПОДДЕРЖКА МУЛЬТИ-ЗАВЕДЕНИЙ)
 // ==========================================
 
 function getFormattedDateTime() {
@@ -34,7 +36,6 @@ function getFormattedDateTime() {
 }
 
 function showConfirm(message, callback) {
-    // Check if we are inside Telegram. tg.platform is 'unknown' in a regular browser.
     const isTelegram = tg && tg.platform && tg.platform !== 'unknown';
     
     if (isTelegram && typeof tg.showPopup === 'function') {
@@ -52,7 +53,6 @@ function showConfirm(message, callback) {
                 }
             });
         } catch (e) {
-            // Fallback just in case showPopup fails internally
             const confirmed = confirm(message);
             if (typeof callback === 'function') {
                 callback(confirmed);
@@ -67,19 +67,23 @@ function showConfirm(message, callback) {
 }
 
 function updateDraftsButton() {
+    const venueId = currentVenue ? (currentVenue.id || "") : "";
     const drafts = JSON.parse(localStorage.getItem('sourdog_drafts') || '[]');
-    const badge = document.getElementById('drafts-badge');
+    const venueDrafts = drafts.filter(d => (d.venueId || "") === venueId);
     
+    const badge = document.getElementById('drafts-badge');
     if (badge) {
-        badge.textContent = drafts.length;
+        badge.textContent = venueDrafts.length;
     }
 
-    cleanupHistory(); // ensure expired items are removed
+    cleanupHistory();
     const history = JSON.parse(localStorage.getItem('sourdog_history') || '[]');
+    const venueHistory = history.filter(h => (h.venueId || "") === venueId);
+    
     const hBadge = document.getElementById('history-badge');
     if (hBadge) {
-        if (history.length > 0) {
-            hBadge.textContent = history.length;
+        if (venueHistory.length > 0) {
+            hBadge.textContent = venueHistory.length;
             hBadge.style.display = 'inline-block';
         } else {
             hBadge.style.display = 'none';
@@ -105,14 +109,16 @@ function renderHistory() {
     const container = document.getElementById('history-container');
     container.innerHTML = '';
     
+    const venueId = currentVenue ? (currentVenue.id || "") : "";
     const history = JSON.parse(localStorage.getItem('sourdog_history') || '[]');
+    const venueHistory = history.filter(h => (h.venueId || "") === venueId);
     
-    if (history.length === 0) {
-        container.innerHTML = '<div style="text-align: center; color: var(--tg-theme-hint-color); padding: 40px 20px;">No sent history from the last 24 hours.</div>';
+    if (venueHistory.length === 0) {
+        container.innerHTML = '<div style="text-align: center; color: var(--tg-theme-hint-color); padding: 40px 20px;">No sent history from the last 24 hours for this establishment.</div>';
         return;
     }
     
-    const sortedHistory = [...history].sort((a, b) => b.timestamp - a.timestamp);
+    const sortedHistory = [...venueHistory].sort((a, b) => b.timestamp - a.timestamp);
     
     sortedHistory.forEach(item => {
         const card = document.createElement('div');
@@ -209,12 +215,14 @@ function saveActiveDraft() {
 
     const drafts = JSON.parse(localStorage.getItem('sourdog_drafts') || '[]');
     let draft = drafts.find(d => d.id === activeDraftId);
+    const venueId = currentVenue ? (currentVenue.id || "") : "";
     
     if (!draft) {
         const dateTime = getFormattedDateTime();
         draft = {
             id: activeDraftId,
             type: subMode,
+            venueId: venueId,
             date: dateTime.date,
             time: dateTime.time,
             startedBy: (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.first_name) ? tg.initDataUnsafe.user.first_name : "Unknown",
@@ -248,6 +256,7 @@ function saveActiveDraft() {
     });
 
     draft.items = items;
+    draft.venueId = venueId;
     localStorage.setItem('sourdog_drafts', JSON.stringify(drafts));
     updateDraftsButton();
 }
@@ -261,14 +270,16 @@ function renderDrafts() {
     const container = document.getElementById('drafts-container');
     container.innerHTML = '';
     
+    const venueId = currentVenue ? (currentVenue.id || "") : "";
     const drafts = JSON.parse(localStorage.getItem('sourdog_drafts') || '[]');
+    const venueDrafts = drafts.filter(d => (d.venueId || "") === venueId);
     
-    if (drafts.length === 0) {
-        container.innerHTML = '<div style="text-align: center; color: var(--tg-theme-hint-color); padding: 40px 20px;">No active drafts found.</div>';
+    if (venueDrafts.length === 0) {
+        container.innerHTML = '<div style="text-align: center; color: var(--tg-theme-hint-color); padding: 40px 20px;">No active drafts found for this establishment.</div>';
         return;
     }
     
-    const sortedDrafts = [...drafts].reverse();
+    const sortedDrafts = [...venueDrafts].reverse();
     
     sortedDrafts.forEach(draft => {
         const card = document.createElement('div');
@@ -380,8 +391,8 @@ function deleteDraft(draftId) {
         activeDraftId = null;
     }
     
-    renderDrafts();
     updateDraftsButton();
+    renderDrafts();
 }
 
 let activeHistoryDotsMenu = null;
@@ -514,24 +525,132 @@ function resumeDraft(draftId) {
     showScreen('inventory-screen');
 }
 
-// Инициализация
+// Инициализация Telegram WebApp
 tg.expand();
 tg.ready();
 
 document.addEventListener('DOMContentLoaded', () => {
     cleanupHistory();
-    fetchNomenclature();
+    loadVenues();
 });
+
+// ==========================================
+// НАВИГАЦИЯ И ВЫБОР ЗАВЕДЕНИЙ
+// ==========================================
+
+async function loadVenues() {
+    showScreen('loader');
+    
+    if (GAS_URL.includes("macros/s/AKfycbyc")) {
+         console.warn("GAS URL not set. Using test data.");
+         venues = [
+             { id: "v1", name: "SOURDOG Center", rawUrl: "https://docs.google.com/spreadsheets/d/test1/edit" },
+             { id: "v2", name: "SOURDOG West", rawUrl: "https://docs.google.com/spreadsheets/d/test2/edit" }
+         ];
+         setTimeout(() => {
+            showVenuesScreen();
+         }, 500);
+         return;
+    }
+
+    try {
+        const userId = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) ? tg.initDataUnsafe.user.id : "";
+        const response = await fetch(`${GAS_URL}?action=get_venues&userId=${userId}`);
+        const data = await response.json();
+        
+        if (data.error === "access_denied") {
+            document.getElementById('blocked-message').textContent = data.message || "To use this bot, you must be a member of the SOURDOG Telegram group.";
+            showScreen('blocked-screen');
+            return;
+        }
+        
+        if (Array.isArray(data) && data.length > 0) {
+            venues = data;
+            showVenuesScreen();
+        } else {
+            // Фолбэк на 1 заведение, если реестр пока пуст
+            venues = [];
+            currentVenue = { id: null, name: "SOURDOG Kitchen" };
+            const badge = document.getElementById('active-venue-name');
+            if (badge) badge.textContent = currentVenue.name;
+            fetchNomenclature(null);
+        }
+    } catch (error) {
+        console.warn("Error loading venues, falling back to active sheet:", error);
+        currentVenue = { id: null, name: "SOURDOG Kitchen" };
+        const badge = document.getElementById('active-venue-name');
+        if (badge) badge.textContent = currentVenue.name;
+        fetchNomenclature(null);
+    }
+}
+
+function showVenuesScreen() {
+    renderVenues();
+    showScreen('venues-screen');
+}
+
+function renderVenues() {
+    const container = document.getElementById('venues-container');
+    if (!container) return;
+    container.innerHTML = '';
+    
+    if (venues.length === 0) {
+        container.innerHTML = '<div style="text-align: center; color: var(--tg-theme-hint-color); padding: 40px 20px;">No establishments found.</div>';
+        return;
+    }
+    
+    venues.forEach(venue => {
+        const card = document.createElement('div');
+        card.className = 'venue-card';
+        card.onclick = () => selectVenue(venue);
+        
+        card.innerHTML = `
+            <div class="venue-info">
+                <div class="venue-icon-wrapper">
+                    <i class="fas fa-store"></i>
+                </div>
+                <div class="venue-details">
+                    <span class="venue-title">${escapeHtml(venue.name)}</span>
+                    <span class="venue-subtitle">Tap to manage</span>
+                </div>
+            </div>
+            <div class="venue-arrow">
+                <i class="fas fa-chevron-right"></i>
+            </div>
+        `;
+        container.appendChild(card);
+    });
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+async function selectVenue(venue) {
+    currentVenue = venue;
+    const badge = document.getElementById('active-venue-name');
+    if (badge) badge.textContent = venue.name;
+    
+    updateDraftsButton();
+    await fetchNomenclature(venue.id);
+}
 
 // ==========================================
 // СЕТЕВОЕ ВЗАИМОДЕЙСТВИЕ
 // ==========================================
 
-async function fetchNomenclature() {
+async function fetchNomenclature(spreadsheetId = null) {
     showScreen('loader');
     
+    const targetId = spreadsheetId !== null ? spreadsheetId : (currentVenue ? (currentVenue.id || "") : "");
+    
     if (GAS_URL.includes("macros/s/AKfycbyc")) {
-         // Fallback test data
          console.warn("GAS URL not set. Using test data.");
          nomenclature = [
              {category: "Cheeses", name: "Mozzarella", unit: "kg"},
@@ -547,7 +666,7 @@ async function fetchNomenclature() {
 
     try {
         const userId = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) ? tg.initDataUnsafe.user.id : "";
-        const response = await fetch(`${GAS_URL}?userId=${userId}`);
+        const response = await fetch(`${GAS_URL}?action=get_nomenclature&spreadsheetId=${encodeURIComponent(targetId)}&userId=${userId}`);
         const data = await response.json();
         
         if (data.error === "access_denied") {
@@ -556,7 +675,7 @@ async function fetchNomenclature() {
         } else if (data.error) {
             showAlert("Server Error: " + data.error);
         } else {
-            nomenclature = data;
+            nomenclature = Array.isArray(data) ? data : [];
             updateDraftsButton();
             showScreen('menu-screen');
         }
@@ -595,6 +714,7 @@ async function sendDataToGAS(action, dataObj, extraParams = {}) {
             body: JSON.stringify({
                 action: action,
                 data: dataObj,
+                spreadsheetId: currentVenue ? (currentVenue.id || "") : "",
                 userId: (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) ? tg.initDataUnsafe.user.id : "",
                 user: (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.first_name) ? tg.initDataUnsafe.user.first_name : "Unknown",
                 ...extraParams
@@ -658,12 +778,10 @@ function renderInventory() {
                 saveActiveDraft();
             };
             
-            // Сохраняем метаданные в элементе
             input.dataset.category = categoryName;
             input.dataset.name = prod.name;
             input.dataset.unit = prod.unit;
 
-            // Задаем хинт 0.000 для весовых/жидких продуктов
             const isWeightOrLiquid = (prod.unit && (prod.unit.toLowerCase() === 'kg' || prod.unit.toLowerCase() === 'кг' || prod.unit.toLowerCase() === 'l' || prod.unit.toLowerCase() === 'л'));
             input.placeholder = isWeightOrLiquid ? "0.000" : "0";
 
@@ -673,7 +791,7 @@ function renderInventory() {
         container.appendChild(catTpl);
     }
 
-    updateSubmitButtonState(); // Скрыть если пусто
+    updateSubmitButtonState();
 }
 
 function updateSubmitButtonState() {
@@ -692,14 +810,12 @@ function updateSubmitButtonState() {
         btnContainer.style.display = 'none';
     }
 
-    // Обновляем подсказки перевода в граммы / мл
     updateAllUnitHelpers();
 }
 
 async function submitInventory() {
     const inputs = document.querySelectorAll('#inventory-container .amount-input-simple');
     
-    // Группируем количества в виде строк для сохранения точности (дробная часть)
     const groups = {};
     inputs.forEach(input => {
         const valStr = input.value.trim();
@@ -728,14 +844,13 @@ async function submitInventory() {
             }
         });
         
-        // Форматируем сумму с максимальной точностью из введенных полей
         const formattedAmount = sum.toFixed(maxDecimals);
         
         itemsToSave.push({
             category: category,
             name: name,
             unit: unit,
-            amount: formattedAmount // отправляем как строку (например, "0.180")
+            amount: formattedAmount
         });
     }
 
@@ -760,7 +875,8 @@ async function submitInventory() {
         if (draftIndex !== -1) {
             const completedDraft = drafts[draftIndex];
             completedDraft.timestamp = Date.now();
-            completedDraft.date = historyOriginalDate || completedDraft.date; // Keep original date in history
+            completedDraft.venueId = currentVenue ? (currentVenue.id || "") : "";
+            completedDraft.date = historyOriginalDate || completedDraft.date;
             
             const history = JSON.parse(localStorage.getItem('sourdog_history') || '[]');
             const filteredHistory = history.filter(h => h.id !== activeDraftId);
@@ -775,10 +891,8 @@ async function submitInventory() {
         isHistoryEdit = false;
         historyOriginalDate = null;
 
-        // Сбрасываем значения всех инпутов
         inputs.forEach(input => input.value = '');
         
-        // Удаляем все добавленные строки
         document.querySelectorAll('#inventory-container .sub-inputs-container').forEach(container => {
             container.innerHTML = '';
         });
@@ -795,26 +909,23 @@ async function submitInventory() {
     }
 }
 
-// Запуск определенного режима из меню
 function startAppMode(mode) {
     subMode = mode;
     isHistoryEdit = false;
     historyOriginalDate = null;
     
-    // Меняем заголовок экрана
     document.getElementById('screen-title').textContent = mode === 'inventory' ? 'Inventory' : 'Write-offs';
     
-    // Меняем текст кнопки отправки
     const btn = document.getElementById('btn-submit-inventory');
     btn.textContent = mode === 'inventory' ? 'Submit Inventory' : 'Submit Write-off';
     
-    // Генерируем новый ID черновика
     activeDraftId = "draft_" + Date.now();
     
     const dateTime = getFormattedDateTime();
     const newDraft = {
         id: activeDraftId,
         type: subMode,
+        venueId: currentVenue ? (currentVenue.id || "") : "",
         date: dateTime.date,
         time: dateTime.time,
         startedBy: (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.first_name) ? tg.initDataUnsafe.user.first_name : "Unknown",
@@ -829,7 +940,7 @@ function startAppMode(mode) {
 }
 
 function goToMainMenu() {
-    activeDraftId = null; // Очищаем активный черновик при возврате на главный экран
+    activeDraftId = null;
     isHistoryEdit = false;
     historyOriginalDate = null;
     updateDraftsButton();
@@ -842,7 +953,8 @@ function goToMainMenu() {
 
 function showScreen(id) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    document.getElementById(id).classList.add('active');
+    const target = document.getElementById(id);
+    if (target) target.classList.add('active');
 }
 
 function openPasswordModal() {
@@ -941,7 +1053,6 @@ function appendProductEditBlock(container, name = "", unit = "") {
     container.appendChild(prodTpl);
 }
 
-// Функции для кнопок в режиме редактирования (вызываются из HTML)
 function addCategory() {
     const container = document.getElementById('edit-container');
     appendCategoryEditBlock(container, "", []);
@@ -964,13 +1075,12 @@ function deleteProduct(btn) {
 }
 
 async function submitNomenclature() {
-    // Собираем данные из DOM
     const newNomenclature = [];
     const catBlocks = document.querySelectorAll('#edit-container .category-block');
 
     catBlocks.forEach(catBlock => {
         const catName = catBlock.querySelector('.category-name-input').value.trim();
-        if (!catName) return; // Игнорируем пустые категории
+        if (!catName) return;
 
         const prodItems = catBlock.querySelectorAll('.product-item');
         prodItems.forEach(prodItem => {
@@ -989,7 +1099,7 @@ async function submitNomenclature() {
 
     const success = await sendDataToGAS('update_nomenclature', newNomenclature);
     if (success) {
-        nomenclature = newNomenclature; // Обновляем локально
+        nomenclature = newNomenclature;
         showSuccessModal(
             "Database Saved", 
             "The product nomenclature database has been successfully updated in Google Sheets.", 
@@ -1011,9 +1121,6 @@ function groupByCategory(items) {
     }, {});
 }
 
-// ==========================================
-// ЛОГИКА ДОБАВЛЕНИЯ/УДАЛЕНИЯ ПОЛЕЙ ВВОДА (3 ТОЧКИ)
-// ==========================================
 let activeDotsMenu = null;
 let activeDotsMenuHandler = null;
 
@@ -1021,7 +1128,6 @@ function showDotsMenu(button, event) {
     event.stopPropagation();
     event.preventDefault();
     
-    // Закрываем предыдущее меню, если оно открыто
     if (activeDotsMenu) {
         activeDotsMenu.remove();
         activeDotsMenu = null;
@@ -1034,11 +1140,9 @@ function showDotsMenu(button, event) {
     const productGroup = button.closest('.product-group');
     const inputsCount = productGroup.querySelectorAll('.amount-input-simple').length;
     
-    // Создаем элемент меню
     const menu = document.createElement('div');
     menu.className = 'dots-menu';
     
-    // Пункт "Добавить строку"
     const addBtn = document.createElement('div');
     addBtn.className = 'dots-menu-item';
     addBtn.innerHTML = '<i class="fas fa-plus"></i> Add';
@@ -1049,7 +1153,6 @@ function showDotsMenu(button, event) {
     };
     menu.appendChild(addBtn);
     
-    // Пункт "Удалить строку"
     const delBtn = document.createElement('div');
     delBtn.className = 'dots-menu-item text-danger';
     if (inputsCount <= 1) {
@@ -1065,16 +1168,13 @@ function showDotsMenu(button, event) {
     };
     menu.appendChild(delBtn);
     
-    // Добавляем меню в body, чтобы избежать проблем с overflow hidden
     document.body.appendChild(menu);
     activeDotsMenu = menu;
     
-    // Позиционируем меню рядом с кнопкой
     const rect = button.getBoundingClientRect();
     menu.style.top = `${rect.bottom + window.scrollY + 4}px`;
     menu.style.left = `${rect.right + window.scrollX - menu.offsetWidth}px`;
     
-    // Закрытие меню при клике в любое другое место
     activeDotsMenuHandler = (e) => {
         if (activeDotsMenu && !activeDotsMenu.contains(e.target) && e.target !== button) {
             activeDotsMenu.remove();
@@ -1132,7 +1232,6 @@ function handleAddLine(button, shouldFocus = true) {
     subContainer.appendChild(subItem);
     saveActiveDraft();
     
-    // Auto-focus the new input
     if (shouldFocus) {
         setTimeout(() => newInput.focus(), 50);
     }
@@ -1163,20 +1262,16 @@ function handleDeleteLine(button) {
 }
 
 function sanitizeDecimalInput(input) {
-    // Заменяем все запятые на точки
     let val = input.value.replace(/,/g, '.');
-    // Удаляем все символы кроме цифр и одной точки
     val = val.replace(/[^0-9.]/g, '');
     
     const parts = val.split('.');
     if (parts.length > 2) {
-        // Если точек несколько, оставляем только первую
         val = parts[0] + '.' + parts.slice(1).join('');
     }
     input.value = val;
 }
 
-// Автоматический пересчет и отображение граммов/миллилитров для каждого отдельного поля ввода
 function updateAllUnitHelpers() {
     const inputs = document.querySelectorAll('#inventory-container .amount-input-simple');
     inputs.forEach(input => {
@@ -1189,7 +1284,7 @@ function updateAllUnitHelpers() {
         const baseUnit = input.dataset.unit || "";
         
         if (isNaN(val) || val <= 0 || !baseUnit) {
-            helper.textContent = ""; // очищаем если поле пустое
+            helper.textContent = "";
             return;
         }
         
@@ -1225,7 +1320,6 @@ function updateAllUnitHelpers() {
         }
     });
 
-    // Возвращаем подписи в product-unit в исходное состояние (кг/л/шт)
     const mainUnits = document.querySelectorAll('#inventory-container .product-unit');
     mainUnits.forEach(label => {
         const productGroup = label.closest('.product-group');
