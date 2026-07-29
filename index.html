@@ -52,12 +52,6 @@
 
         <!-- Establishment Selection Screen -->
         <div id="venues-screen" class="screen">
-            <div class="menu-header" style="justify-content: center; text-align: center;">
-                <div class="logo-container">
-                    <h1 class="subtitle" style="font-size: 18px; color: var(--tg-theme-text-color); margin: 0; letter-spacing: 1px; font-weight: bold;">Select Establishment</h1>
-                </div>
-            </div>
-            
             <div class="list-container" style="padding-top: 10px;">
                 <div id="venues-container">
                     <!-- Venue cards will render here dynamically -->
@@ -70,8 +64,7 @@
             <div class="menu-header">
                 <button class="icon-btn-back" onclick="showVenuesScreen()"><i class="fas fa-arrow-left"></i></button>
                 <div class="logo-container" style="text-align: center; flex: 1;">
-                    <h1 class="subtitle" style="font-size: 16px; color: var(--tg-theme-text-color); margin: 0; letter-spacing: 1px; font-weight: bold;">KITCHEN MANAGEMENT</h1>
-                    <span id="active-venue-badge" class="venue-active-pill"><i class="fas fa-store"></i> <span id="active-venue-name">Establishment</span></span>
+                    <h1 id="active-venue-name" style="font-size: 18px; color: var(--tg-theme-text-color); margin: 0; letter-spacing: 1px; font-weight: bold; text-transform: uppercase;">Establishment</h1>
                 </div>
                 <button class="icon-btn-settings" onclick="openPasswordModal()"><i class="fas fa-cog"></i></button>
             </div>
@@ -216,6 +209,6 @@
         </div>
     </template>
 
-    <script src="app.js?v=25"></script>
+    <script src="app.js?v=26"></script>
 </body>
 </html>
